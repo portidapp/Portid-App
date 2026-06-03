@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN layout text NOT NULL DEFAULT 'classic';
