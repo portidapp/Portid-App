@@ -1,20 +1,20 @@
 import React, { useEffect, useRef, useState } from 'react';
-import QRCodeStyling, { 
-  Options, 
-  DrawType, 
-  TypeNumber, 
-  ErrorCorrectionLevel, 
-  DotType, 
-  CornerSquareType, 
-  CornerDotType, 
+import QRCodeStyling, {
+  Options,
+  DrawType,
+  TypeNumber,
+  ErrorCorrectionLevel,
+  DotType,
+  CornerSquareType,
+  CornerDotType,
   FileExtension
 } from 'qr-code-styling';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogDescription 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription
 } from '@/components/ui/dialog';
 
 import { Button } from '@/components/ui/button';
@@ -45,7 +45,7 @@ const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({ isOpen, onClose, pr
   const isPremium = planTier === 'premium';
   const [size, setSize] = useState<number>(1024);
   const [transparent, setTransparent] = useState<boolean>(isPremium);
-  
+
   useEffect(() => {
     setTransparent(isPremium);
   }, [isPremium]);
@@ -79,11 +79,11 @@ const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({ isOpen, onClose, pr
           }
         });
       }
-      
+
       if (node.children.length === 0) {
         qrCodeInstance.current.append(node);
       }
-      
+
       qrCodeInstance.current.update({
         data: profileUrl,
         dotsOptions: { color: mainColor },
@@ -148,8 +148,8 @@ const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({ isOpen, onClose, pr
 
             <div className="flex flex-col items-center justify-center space-y-3 rounded-[32px] bg-muted/20 p-4 md:p-6 border border-white/50 shadow-inner relative overflow-hidden group">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(0,0,0,0.02)_0%,transparent_100%)]" />
-              
-              <div 
+
+              <div
                 className="flex items-center justify-between w-full px-1 z-10 cursor-pointer animate-in fade-in"
                 onClick={() => {
                   if (!isPremium) {
@@ -163,11 +163,11 @@ const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({ isOpen, onClose, pr
                   Transparent BG
                   {!isPremium && <Crown className="h-3 w-3 text-amber-500 fill-amber-500" />}
                 </Label>
-                <Switch 
-                  id="transparency" 
+                <Switch
+                  id="transparency"
                   disabled={!isPremium}
-                  checked={transparent} 
-                  onCheckedChange={setTransparent} 
+                  checked={transparent}
+                  onCheckedChange={setTransparent}
                   className="data-[state=checked]:bg-primary scale-75"
                 />
               </div>
@@ -175,7 +175,7 @@ const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({ isOpen, onClose, pr
               <div className="relative z-10 transition-all duration-700 ease-out drop-shadow-xl scale-90 md:scale-100">
                 <div ref={handleRef} />
               </div>
-              
+
               <div className="z-10 flex items-center gap-2 rounded-full bg-white/70 backdrop-blur-md px-3 py-1 border border-white/50 shadow-sm border-b">
                 <div className="h-1.5 w-1.5 rounded-full shadow-inner" style={{ backgroundColor: mainColor }} />
                 <span className="text-[9px] font-bold uppercase tracking-widest opacity-70">
@@ -185,9 +185,9 @@ const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({ isOpen, onClose, pr
             </div>
 
             <div className="grid grid-cols-2 gap-3 px-1">
-              <Button 
-                variant="outline" 
-                size="lg" 
+              <Button
+                variant="outline"
+                size="lg"
                 className="h-12 rounded-xl border-none bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all gap-2"
                 onClick={() => handleDownload('png')}
               >
@@ -197,9 +197,9 @@ const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({ isOpen, onClose, pr
                   <span className="text-[8px] opacity-70">{transparent ? 'Transparent' : 'White'}</span>
                 </div>
               </Button>
-              <Button 
-                variant="outline" 
-                size="lg" 
+              <Button
+                variant="outline"
+                size="lg"
                 className="h-12 rounded-xl border-none bg-white shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all gap-2"
                 onClick={() => handleDownload('jpeg')}
               >

@@ -38,26 +38,26 @@ const CATEGORIES = [
 ];
 
 const THEMES = [
-  { id: 'minimal',  label: 'Minimal',  colors: 'bg-white border border-gray-200' },
-  { id: 'dark',     label: 'Dark',     colors: 'bg-[#0f172a]' },
-  { id: 'luxury',   label: 'Luxury',   colors: 'bg-gradient-to-br from-amber-900 to-amber-700' },
-  { id: 'modern',   label: 'Modern',   colors: 'bg-gradient-to-br from-blue-600 to-purple-600' },
+  { id: 'minimal', label: 'Minimal', colors: 'bg-white border border-gray-200' },
+  { id: 'dark', label: 'Dark', colors: 'bg-[#0f172a]' },
+  { id: 'luxury', label: 'Luxury', colors: 'bg-gradient-to-br from-amber-900 to-amber-700' },
+  { id: 'modern', label: 'Modern', colors: 'bg-gradient-to-br from-blue-600 to-purple-600' },
   { id: 'colorful', label: 'Colorful', colors: 'bg-gradient-to-br from-pink-500 to-yellow-500' },
-  { id: 'ocean',    label: 'Ocean',    colors: 'bg-gradient-to-br from-sky-900 to-cyan-800' },
-  { id: 'forest',   label: 'Forest',   colors: 'bg-gradient-to-br from-green-900 to-green-700' },
-  { id: 'sunset',   label: 'Sunset',   colors: 'bg-gradient-to-br from-orange-900 to-red-700' },
+  { id: 'ocean', label: 'Ocean', colors: 'bg-gradient-to-br from-sky-900 to-cyan-800' },
+  { id: 'forest', label: 'Forest', colors: 'bg-gradient-to-br from-green-900 to-green-700' },
+  { id: 'sunset', label: 'Sunset', colors: 'bg-gradient-to-br from-orange-900 to-red-700' },
   { id: 'midnight', label: 'Midnight', colors: 'bg-gradient-to-br from-[#0f0f23] to-purple-900' },
-  { id: 'rose',     label: 'Rose',     colors: 'bg-gradient-to-br from-rose-100 to-pink-200' },
+  { id: 'rose', label: 'Rose', colors: 'bg-gradient-to-br from-rose-100 to-pink-200' },
   { id: 'lavender', label: 'Lavender', colors: 'bg-gradient-to-br from-indigo-100 to-purple-200' },
-  { id: 'coffee',   label: 'Coffee',   colors: 'bg-gradient-to-br from-stone-200 to-stone-400' },
-  { id: 'emerald',  label: 'Emerald',  colors: 'bg-gradient-to-br from-emerald-100 to-emerald-300' },
-  { id: 'cherry',   label: 'Cherry',   colors: 'bg-gradient-to-br from-red-100 to-red-300' },
-  { id: 'gold',     label: 'Gold',     colors: 'bg-gradient-to-br from-yellow-100 to-yellow-300' },
-  { id: 'slate',    label: 'Slate',    colors: 'bg-gradient-to-br from-slate-200 to-slate-400' },
+  { id: 'coffee', label: 'Coffee', colors: 'bg-gradient-to-br from-stone-200 to-stone-400' },
+  { id: 'emerald', label: 'Emerald', colors: 'bg-gradient-to-br from-emerald-100 to-emerald-300' },
+  { id: 'cherry', label: 'Cherry', colors: 'bg-gradient-to-br from-red-100 to-red-300' },
+  { id: 'gold', label: 'Gold', colors: 'bg-gradient-to-br from-yellow-100 to-yellow-300' },
+  { id: 'slate', label: 'Slate', colors: 'bg-gradient-to-br from-slate-200 to-slate-400' },
   { id: 'sapphire', label: 'Sapphire', colors: 'bg-gradient-to-br from-blue-200 to-blue-400' },
-  { id: 'mint',     label: 'Mint',     colors: 'bg-gradient-to-br from-green-100 to-green-300' },
-  { id: 'orange',   label: 'Orange',   colors: 'bg-gradient-to-br from-orange-400 to-amber-500' },
-  { id: 'custom',   label: 'Custom',   colors: 'bg-gradient-to-br from-violet-500 to-fuchsia-500' },
+  { id: 'mint', label: 'Mint', colors: 'bg-gradient-to-br from-green-100 to-green-300' },
+  { id: 'orange', label: 'Orange', colors: 'bg-gradient-to-br from-orange-400 to-amber-500' },
+  { id: 'custom', label: 'Custom', colors: 'bg-gradient-to-br from-violet-500 to-fuchsia-500' },
 ];
 
 interface FormData {
@@ -131,7 +131,7 @@ const CreateProfile = () => {
         if (typeof parsedForm === 'object' && parsedForm !== null && !Array.isArray(parsedForm)) {
           return { ...initialForm, ...parsedForm, logo: null, cover: null, logo_preview: '', cover_preview: '' };
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     return initialForm;
   });
@@ -141,7 +141,7 @@ const CreateProfile = () => {
       try {
         const parsedForm = JSON.parse(savedForm);
         return parsedForm.category ? !CATEGORIES.some(c => c.id === parsedForm.category) : false;
-      } catch (e) {}
+      } catch (e) { }
     }
     return false;
   });
@@ -151,7 +151,7 @@ const CreateProfile = () => {
       try {
         const parsedForm = JSON.parse(savedForm);
         return (parsedForm.category && !CATEGORIES.some(c => c.id === parsedForm.category)) ? parsedForm.category : '';
-      } catch (e) {}
+      } catch (e) { }
     }
     return '';
   });
@@ -204,48 +204,48 @@ const CreateProfile = () => {
           <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 animate-gradient-x" />
 
           <div className="mx-auto w-24 h-24 bg-green-50 rounded-full flex items-center justify-center mb-8 relative">
-             <motion.div
-               animate={{ scale: [1, 1.2, 1] }}
-               transition={{ duration: 2, repeat: Infinity }}
-               className="absolute inset-0 bg-green-100 rounded-full"
-             />
-             <Check className="h-10 w-10 text-green-600 relative z-10" />
+            <motion.div
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="absolute inset-0 bg-green-100 rounded-full"
+            />
+            <Check className="h-10 w-10 text-green-600 relative z-10" />
           </div>
 
           <h2 className="text-4xl font-black text-zinc-900 tracking-tight leading-tight">Your profile is live 🎉</h2>
           <p className="text-zinc-500 font-medium mt-4">It's beautiful. You can start sharing it now or head to the editor for final touches.</p>
 
           <div className="mt-10 p-2 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-2">
-             <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-zinc-100 shadow-sm">
-                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Profile Link</span>
-                <span className="text-xs font-bold text-zinc-900 truncate max-w-[180px] ml-4">{url}</span>
-             </div>
+            <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-zinc-100 shadow-sm">
+              <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Profile Link</span>
+              <span className="text-xs font-bold text-zinc-900 truncate max-w-[180px] ml-4">{url}</span>
+            </div>
 
-             <Button
-               onClick={() => {
-                 navigator.clipboard.writeText(url);
-                 toast.success("Link copied to clipboard!");
-               }}
-               className="w-full h-14 bg-zinc-950 hover:bg-zinc-800 text-white rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-xl shadow-zinc-950/20 active:scale-95"
-             >
-               Copy Link
-             </Button>
+            <Button
+              onClick={() => {
+                navigator.clipboard.writeText(url);
+                toast.success("Link copied to clipboard!");
+              }}
+              className="w-full h-14 bg-zinc-950 hover:bg-zinc-800 text-white rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-xl shadow-zinc-950/20 active:scale-95"
+            >
+              Copy Link
+            </Button>
           </div>
 
           <div className="grid grid-cols-2 gap-4 mt-6">
-             <Button
-               variant="outline"
-               onClick={() => window.open(url, '_blank')}
-               className="h-14 border-zinc-200 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-zinc-50"
-             >
-               View Profile
-             </Button>
-             <Button
-               onClick={() => navigate(`/dashboard`)}
-               className="h-14 bg-white text-zinc-950 border-2 border-zinc-950 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-zinc-950 hover:text-white transition-all"
-             >
-               Enter Editor
-             </Button>
+            <Button
+              variant="outline"
+              onClick={() => window.open(url, '_blank')}
+              className="h-14 border-zinc-200 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-zinc-50"
+            >
+              View Profile
+            </Button>
+            <Button
+              onClick={() => navigate(`/dashboard`)}
+              className="h-14 bg-white text-zinc-950 border-2 border-zinc-950 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-zinc-950 hover:text-white transition-all"
+            >
+              Enter Editor
+            </Button>
           </div>
         </motion.div>
       </div>
@@ -263,7 +263,7 @@ const CreateProfile = () => {
     const isLogo = path.includes('/logo-');
     const maxDim = isLogo ? 800 : 1600;
     const compressedFile = await compressAndConvertToWebP(file, maxDim, 0.85);
-    
+
     // Ensure suffix ends in .webp
     const fullPath = path.endsWith('.webp') ? path : `${path}.webp`;
 
@@ -303,9 +303,9 @@ const CreateProfile = () => {
 
       const themeValue = currentForm.theme === 'custom'
         ? encodeCustomTheme({
-            bg: currentForm.custom_bg, text: currentForm.custom_text, muted: currentForm.custom_muted,
-            cardBg: currentForm.custom_card_bg, btnBg: currentForm.custom_btn_bg, btnText: currentForm.custom_btn_text,
-          })
+          bg: currentForm.custom_bg, text: currentForm.custom_text, muted: currentForm.custom_muted,
+          cardBg: currentForm.custom_card_bg, btnBg: currentForm.custom_btn_bg, btnText: currentForm.custom_btn_text,
+        })
         : currentForm.theme;
 
       // 2. Insert Profile
@@ -398,19 +398,19 @@ const CreateProfile = () => {
 
   const canProceed = () => {
     switch (step) {
-      case 0: 
-        return (form.brand_name || '').trim() !== '' && 
-               (form.category || '') !== '' && 
-               (!isOtherSelected || ((otherCategory || '').trim() !== ''));
-      case 1: 
+      case 0:
+        return (form.brand_name || '').trim() !== '' &&
+          (form.category || '') !== '' &&
+          (!isOtherSelected || ((otherCategory || '').trim() !== ''));
+      case 1:
         return true;
-      case 2: 
+      case 2:
         return true;
-      case 3: 
+      case 3:
         return true;
-      case 4: 
+      case 4:
         return true;
-      default: 
+      default:
         return true;
     }
   };
@@ -456,35 +456,31 @@ const CreateProfile = () => {
                         updateForm({ category: cat.id });
                       }
                     }}
-                    className={`group relative overflow-hidden rounded-2xl p-4 text-center transition-all duration-300 border-2 ${
-                      (cat.id === 'Other' ? isOtherSelected : (!isOtherSelected && form.category === cat.id))
+                    className={`group relative overflow-hidden rounded-2xl p-4 text-center transition-all duration-300 border-2 ${(cat.id === 'Other' ? isOtherSelected : (!isOtherSelected && form.category === cat.id))
                         ? 'bg-white border-orange-500 shadow-2xl shadow-orange-500/20 scale-[1.05] z-10'
                         : 'bg-white border-zinc-100 hover:border-orange-200 hover:shadow-lg'
-                    }`}
+                      }`}
                   >
                     <div className="flex flex-col items-center space-y-3">
-                      <div className={`flex h-14 w-14 items-center justify-center rounded-2xl text-3xl transition-all duration-500 ${
-                        (cat.id === 'Other' ? isOtherSelected : (!isOtherSelected && form.category === cat.id))
+                      <div className={`flex h-14 w-14 items-center justify-center rounded-2xl text-3xl transition-all duration-500 ${(cat.id === 'Other' ? isOtherSelected : (!isOtherSelected && form.category === cat.id))
                           ? 'bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-lg rotate-3'
                           : 'bg-zinc-50 group-hover:bg-orange-50 group-hover:scale-110 group-hover:-rotate-3'
-                      }`}>
+                        }`}>
                         {cat.icon}
                       </div>
 
                       <div className="space-y-1.5">
-                        <span className={`text-[12px] font-extrabold transition-colors tracking-tight leading-tight block ${
-                          (cat.id === 'Other' ? isOtherSelected : (!isOtherSelected && form.category === cat.id)) ? 'text-orange-600' : 'text-zinc-800'
-                        }`}>
+                        <span className={`text-[12px] font-extrabold transition-colors tracking-tight leading-tight block ${(cat.id === 'Other' ? isOtherSelected : (!isOtherSelected && form.category === cat.id)) ? 'text-orange-600' : 'text-zinc-800'
+                          }`}>
                           {cat.label}
                         </span>
                         {cat.popular && (
                           <div className="flex justify-center">
-                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-widest ${
-                              (cat.id === 'Other' ? isOtherSelected : (!isOtherSelected && form.category === cat.id))
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-widest ${(cat.id === 'Other' ? isOtherSelected : (!isOtherSelected && form.category === cat.id))
                                 ? 'bg-orange-600 text-white shadow-sm'
                                 : 'bg-orange-100 text-orange-600'
-                            }`}>
-                               Popular
+                              }`}>
+                              Popular
                             </span>
                           </div>
                         )}
@@ -639,11 +635,10 @@ const CreateProfile = () => {
                   <button
                     key={l.id}
                     onClick={() => updateForm({ layout: l.id })}
-                    className={`w-full rounded-xl p-4 text-left transition-all border-2 ${
-                      form.layout === l.id
+                    className={`w-full rounded-xl p-4 text-left transition-all border-2 ${form.layout === l.id
                         ? 'border-orange-500 bg-orange-50 shadow-sm'
                         : 'border-zinc-100 bg-white hover:border-orange-200 hover:bg-orange-50/30'
-                    }`}
+                      }`}
                   >
                     <span className={`text-sm font-bold ${form.layout === l.id ? 'text-orange-600' : 'text-zinc-800'}`}>{l.label}</span>
                     <p className="mt-0.5 text-xs text-zinc-500">{l.description}</p>
@@ -662,9 +657,8 @@ const CreateProfile = () => {
                   <button
                     key={t.id}
                     onClick={() => updateForm({ theme: t.id })}
-                    className={`w-full flex flex-col p-3 rounded-xl border-2 transition-all relative ${
-                      form.theme === t.id ? 'border-orange-500 bg-orange-50 shadow-sm' : 'border-transparent bg-zinc-50 hover:bg-zinc-100'
-                    }`}
+                    className={`w-full flex flex-col p-3 rounded-xl border-2 transition-all relative ${form.theme === t.id ? 'border-orange-500 bg-orange-50 shadow-sm' : 'border-transparent bg-zinc-50 hover:bg-zinc-100'
+                      }`}
                   >
                     <div className={`w-full h-10 rounded-lg mb-2 ${t.colors} border border-black/5 shadow-sm`} />
                     <span className={`text-[11px] font-bold ${form.theme === t.id ? 'text-orange-600' : 'text-zinc-600'}`}>{t.label}</span>

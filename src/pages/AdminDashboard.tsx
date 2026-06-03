@@ -63,7 +63,7 @@ interface SupportEnquiry {
 const AdminDashboard = () => {
   const { signOut } = useAuth();
   const navigate = useNavigate();
-  
+
   // State
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [users, setUsers] = useState<UserRole[]>([]);
@@ -71,7 +71,7 @@ const AdminDashboard = () => {
   const [analytics, setAnalytics] = useState<AnalyticsEvent[]>([]);
   const [enquiries, setEnquiries] = useState<SupportEnquiry[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Controls
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'profiles' | 'analytics' | 'enquiries'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
@@ -108,7 +108,7 @@ const AdminDashboard = () => {
 
   const handleDeleteProfile = async (id: string, name: string) => {
     if (!confirm(`Are you absolutely sure you want to delete the profile "${name}"? This action is permanent.`)) return;
-    
+
     const { error } = await supabase.from('profiles').delete().eq('id', id);
     if (error) {
       toast.error(error.message);
@@ -122,7 +122,7 @@ const AdminDashboard = () => {
     const { error } = await supabase
       .from('user_plans')
       .upsert({ user_id: userId, plan_tier: newTier }, { onConflict: 'user_id' });
-    
+
     if (error) {
       toast.error(error.message);
       return;
@@ -142,7 +142,7 @@ const AdminDashboard = () => {
     const { error } = await supabase
       .from('user_roles')
       .upsert({ user_id: userId, role: newRole }, { onConflict: 'user_id' });
-    
+
     if (error) {
       toast.error(error.message);
       return;
@@ -160,7 +160,7 @@ const AdminDashboard = () => {
 
   const handleUpdateEnquiryStatus = async (id: string, newStatus: 'pending' | 'seen' | 'resolved') => {
     const { error } = await supabase.from('support_enquiries').update({ status: newStatus }).eq('id', id);
-    
+
     if (error) {
       toast.error(error.message);
       return;
@@ -191,7 +191,7 @@ const AdminDashboard = () => {
 
   // Process data for charts
   const getDailyChartData = () => {
-    const filteredEvents = selectedProfileId 
+    const filteredEvents = selectedProfileId
       ? analytics.filter(a => a.profile_id === selectedProfileId)
       : analytics;
 
@@ -203,10 +203,10 @@ const AdminDashboard = () => {
     }).reverse();
 
     last30Days.forEach(date => {
-      dayMap[date] = { 
-        date: new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), 
-        views: 0, 
-        clicks: 0 
+      dayMap[date] = {
+        date: new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+        views: 0,
+        clicks: 0
       };
     });
 
@@ -222,7 +222,7 @@ const AdminDashboard = () => {
   };
 
   const getTopButtonsData = () => {
-    const filteredEvents = selectedProfileId 
+    const filteredEvents = selectedProfileId
       ? analytics.filter(a => a.profile_id === selectedProfileId)
       : analytics;
 
@@ -242,7 +242,7 @@ const AdminDashboard = () => {
     let fileName = "";
 
     if (type === 'analytics') {
-      csvContent = "Event Type,Button Name,Timestamp,Profile ID\n" + 
+      csvContent = "Event Type,Button Name,Timestamp,Profile ID\n" +
         analytics.map(e => `${e.event_type},${e.button_name || 'N/A'},${e.created_at},${e.profile_id}`).join("\n");
       fileName = "portid_admin_analytics_report.csv";
     } else if (type === 'profiles') {
@@ -278,8 +278,8 @@ const AdminDashboard = () => {
     if (enquiryFilter !== 'all' && e.status !== enquiryFilter) return false;
     if (searchQuery) {
       return e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-             e.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-             e.message.toLowerCase().includes(searchQuery.toLowerCase());
+        e.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        e.message.toLowerCase().includes(searchQuery.toLowerCase());
     }
     return true;
   });
@@ -294,7 +294,7 @@ const AdminDashboard = () => {
 
   return (
     <div className="flex h-screen bg-[#070708] overflow-hidden text-zinc-100 font-sans">
-      
+
       {/* Docked Sidebar (Desktop Command Center) */}
       <aside className="hidden lg:flex flex-col w-[260px] bg-[#0c0c0e] border-r border-zinc-900 shrink-0 z-20">
         {/* Brand */}
@@ -311,7 +311,7 @@ const AdminDashboard = () => {
         {/* Navigation Sidebar List */}
         <div className="flex-1 py-6 px-4 space-y-1 overflow-y-auto no-scrollbar">
           <p className="px-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3">Management</p>
-          
+
           {[
             { id: 'dashboard', label: 'Overview', icon: Layout },
             { id: 'users', label: 'User Accounts', icon: Users },
@@ -321,11 +321,10 @@ const AdminDashboard = () => {
             <button
               key={item.id}
               onClick={() => { setActiveTab(item.id as any); setSearchQuery(''); }}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-[13px] font-extrabold tracking-tight transition-all text-left ${
-                activeTab === item.id 
-                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' 
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-[13px] font-extrabold tracking-tight transition-all text-left ${activeTab === item.id
+                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
                   : 'text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200'
-              }`}
+                }`}
             >
               <item.icon className="h-4.5 w-4.5 shrink-0" />
               {item.label}
@@ -336,11 +335,10 @@ const AdminDashboard = () => {
             <p className="px-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3">Support CRM</p>
             <button
               onClick={() => { setActiveTab('enquiries'); setSearchQuery(''); }}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[13px] font-extrabold tracking-tight transition-all text-left ${
-                activeTab === 'enquiries' 
-                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' 
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[13px] font-extrabold tracking-tight transition-all text-left ${activeTab === 'enquiries'
+                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
                   : 'text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200'
-              }`}
+                }`}
             >
               <span className="flex items-center gap-3.5">
                 <MessageSquare className="h-4.5 w-4.5 shrink-0" />
@@ -369,7 +367,7 @@ const AdminDashboard = () => {
 
       {/* Main Admin Workspace Container */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
-        
+
         {/* Top Header */}
         <header className="h-20 flex items-center justify-between px-8 border-b border-zinc-900 shrink-0 bg-[#070708]/50 backdrop-blur-md z-10">
           <div className="flex items-center gap-4">
@@ -420,7 +418,7 @@ const AdminDashboard = () => {
 
         {/* Dashboard Work Area */}
         <div className="flex-1 overflow-y-auto px-6 lg:px-8 py-8 space-y-8 pb-12">
-          
+
           {/* TAB 1: OVERVIEW METRICS */}
           {activeTab === 'dashboard' && (
             <div className="space-y-8 animate-fade-in">
@@ -518,9 +516,8 @@ const AdminDashboard = () => {
                         <div key={e.id} className="p-3 bg-zinc-900/40 rounded-2xl border border-zinc-900 hover:border-zinc-800 text-left">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-black text-zinc-200">{e.name}</span>
-                            <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                              e.status === 'pending' ? 'bg-orange-500 text-white' : 'bg-zinc-800 text-zinc-400'
-                            }`}>
+                            <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${e.status === 'pending' ? 'bg-orange-500 text-white' : 'bg-zinc-800 text-zinc-400'
+                              }`}>
                               {e.status}
                             </span>
                           </div>
@@ -574,11 +571,10 @@ const AdminDashboard = () => {
                           <div>
                             <p className="font-mono text-sm font-black text-zinc-100">{u.user_id}</p>
                             <div className="flex items-center gap-3 mt-1.5">
-                              <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${
-                                u.role === 'admin' 
-                                  ? 'bg-orange-500/10 border border-orange-500/15 text-orange-500' 
+                              <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${u.role === 'admin'
+                                  ? 'bg-orange-500/10 border border-orange-500/15 text-orange-500'
                                   : 'bg-zinc-900 border border-zinc-800 text-zinc-400'
-                              }`}>
+                                }`}>
                                 {u.role}
                               </span>
                               <span className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">
@@ -615,7 +611,7 @@ const AdminDashboard = () => {
                             </select>
                           </div>
 
-                          <button 
+                          <button
                             onClick={() => toggleUserExpanded(u.user_id)}
                             className="p-2 bg-zinc-900 hover:bg-zinc-800 rounded-xl self-end mb-0.5 text-zinc-400 hover:text-zinc-200"
                           >
@@ -743,11 +739,10 @@ const AdminDashboard = () => {
                               {p.category || 'Uncategorized'}
                             </td>
                             <td className="px-6 py-4">
-                              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${
-                                p.is_premium
+                              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${p.is_premium
                                   ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm'
                                   : 'bg-zinc-800 text-zinc-500'
-                              }`}>
+                                }`}>
                                 {p.is_premium ? 'Premium' : 'Basic'}
                               </span>
                             </td>
@@ -808,11 +803,10 @@ const AdminDashboard = () => {
                     variant={selectedProfileId === null ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setSelectedProfileId(null)}
-                    className={`rounded-xl px-4 text-xs font-black uppercase tracking-wider transition-all ${
-                      selectedProfileId === null 
-                        ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' 
+                    className={`rounded-xl px-4 text-xs font-black uppercase tracking-wider transition-all ${selectedProfileId === null
+                        ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
                         : 'border-zinc-800 text-zinc-400 hover:bg-zinc-900 hover:text-white'
-                    }`}
+                      }`}
                   >
                     All System Traffic
                   </Button>
@@ -822,11 +816,10 @@ const AdminDashboard = () => {
                       variant={selectedProfileId === p.id ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setSelectedProfileId(p.id)}
-                      className={`rounded-xl px-4 text-xs font-black uppercase tracking-wider transition-all ${
-                        selectedProfileId === p.id 
-                          ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' 
+                      className={`rounded-xl px-4 text-xs font-black uppercase tracking-wider transition-all ${selectedProfileId === p.id
+                          ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
                           : 'border-zinc-800 text-zinc-400 hover:bg-zinc-900 hover:text-white'
-                      }`}
+                        }`}
                     >
                       {p.brand_name}
                     </Button>
@@ -878,24 +871,24 @@ const AdminDashboard = () => {
                               <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                 <defs>
                                   <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#ff782b" stopOpacity={0.3}/>
-                                    <stop offset="95%" stopColor="#ff782b" stopOpacity={0}/>
+                                    <stop offset="5%" stopColor="#ff782b" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="#ff782b" stopOpacity={0} />
                                   </linearGradient>
                                   <linearGradient id="colorClicks" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                                   </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#1c1c21" vertical={false} />
-                                <XAxis 
-                                  dataKey="date" 
-                                  axisLine={false} 
-                                  tickLine={false} 
+                                <XAxis
+                                  dataKey="date"
+                                  axisLine={false}
+                                  tickLine={false}
                                   tick={{ fontSize: 10, fontWeight: 700, fill: '#52525b' }}
                                   minTickGap={25}
                                 />
                                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#52525b' }} />
-                                <Tooltip 
+                                <Tooltip
                                   contentStyle={{ backgroundColor: '#0c0c0e', border: '1px solid #1c1c21', borderRadius: '16px', boxShadow: '0 8px 30px rgba(0,0,0,0.5)', color: '#fafafa', padding: '12px' }}
                                   itemStyle={{ fontSize: '12px', fontWeight: 800 }}
                                 />
@@ -941,7 +934,7 @@ const AdminDashboard = () => {
                                         return <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                       })}
                                     </Pie>
-                                    <Tooltip 
+                                    <Tooltip
                                       contentStyle={{ backgroundColor: '#0c0c0e', border: '1px solid #1c1c21', borderRadius: '12px' }}
                                       itemStyle={{ fontSize: '12px', fontWeight: 800 }}
                                     />
@@ -995,9 +988,8 @@ const AdminDashboard = () => {
                                 return (
                                   <tr key={event.id} className="hover:bg-zinc-900/10 transition-colors">
                                     <td className="px-5 py-3">
-                                      <span className={`inline-flex px-2 py-0.5 rounded-md font-black uppercase text-[8px] tracking-wider ${
-                                        event.event_type === 'view' ? 'bg-orange-500/10 text-orange-500' : 'bg-blue-500/10 text-blue-500'
-                                      }`}>
+                                      <span className={`inline-flex px-2 py-0.5 rounded-md font-black uppercase text-[8px] tracking-wider ${event.event_type === 'view' ? 'bg-orange-500/10 text-orange-500' : 'bg-blue-500/10 text-blue-500'
+                                        }`}>
                                         {event.event_type}
                                       </span>
                                     </td>
@@ -1048,11 +1040,10 @@ const AdminDashboard = () => {
                     <button
                       key={f}
                       onClick={() => setEnquiryFilter(f as any)}
-                      className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${
-                        enquiryFilter === f
+                      className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${enquiryFilter === f
                           ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
                           : 'text-zinc-500 hover:text-zinc-300'
-                      }`}
+                        }`}
                     >
                       {f}
                     </button>
@@ -1063,29 +1054,27 @@ const AdminDashboard = () => {
               {/* Tickets inbox */}
               <div className="grid gap-4">
                 {filteredEnquiries.map(enquiry => (
-                  <div 
-                    key={enquiry.id} 
-                    className={`rounded-3xl border p-6 text-left transition-all ${
-                      enquiry.status === 'pending' 
-                        ? 'border-orange-500/30 bg-orange-500/[0.02] shadow-sm' 
+                  <div
+                    key={enquiry.id}
+                    className={`rounded-3xl border p-6 text-left transition-all ${enquiry.status === 'pending'
+                        ? 'border-orange-500/30 bg-orange-500/[0.02] shadow-sm'
                         : 'border-zinc-900 bg-[#0c0c0e] hover:border-zinc-800'
-                    }`}
+                      }`}
                   >
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2.5">
                           <h4 className="font-black text-sm text-zinc-100">{enquiry.name}</h4>
-                          <span className={`inline-flex px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider border ${
-                            enquiry.status === 'pending' 
+                          <span className={`inline-flex px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider border ${enquiry.status === 'pending'
                               ? 'bg-orange-500/10 border-orange-500/20 text-orange-500 animate-pulse' :
-                            enquiry.status === 'seen' 
-                              ? 'bg-blue-500/10 border-blue-500/20 text-blue-500' :
-                              'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'
-                          }`}>
+                              enquiry.status === 'seen'
+                                ? 'bg-blue-500/10 border-blue-500/20 text-blue-500' :
+                                'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'
+                            }`}>
                             {enquiry.status}
                           </span>
                         </div>
-                        
+
                         <div className="flex flex-wrap gap-4 text-xs font-semibold text-zinc-500 pt-1.5">
                           <a href={`mailto:${enquiry.email}`} className="flex items-center gap-1.5 hover:text-orange-500 transition-colors">
                             <Mail className="h-3.5 w-3.5" /> {enquiry.email}
@@ -1101,8 +1090,8 @@ const AdminDashboard = () => {
 
                       {/* Ticket CRM toggles */}
                       <div className="flex items-center gap-2 shrink-0">
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => handleUpdateEnquiryStatus(enquiry.id, 'seen')}
                           disabled={enquiry.status === 'seen' || enquiry.status === 'resolved'}
@@ -1110,8 +1099,8 @@ const AdminDashboard = () => {
                         >
                           Mark Seen
                         </Button>
-                        <Button 
-                          variant="default" 
+                        <Button
+                          variant="default"
                           size="sm"
                           onClick={() => handleUpdateEnquiryStatus(enquiry.id, 'resolved')}
                           disabled={enquiry.status === 'resolved'}

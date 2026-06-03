@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { 
-  BarChart3, 
-  User, 
-  Image as ImageIcon, 
-  Globe, 
-  Plus, 
+import {
+  BarChart3,
+  User,
+  Image as ImageIcon,
+  Globe,
+  Plus,
   Star,
   LogOut,
   Settings,
@@ -37,9 +37,9 @@ const Dashboard = () => {
   const { user, planTier, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  
+
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
-  const [profileData, setProfileData] = useState<{id: string, slug: string, brand_name: string, theme: string} | null>(null);
+  const [profileData, setProfileData] = useState<{ id: string, slug: string, brand_name: string, theme: string } | null>(null);
   const [isQrOpen, setIsQrOpen] = useState(false);
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -72,7 +72,7 @@ const Dashboard = () => {
             theme: profile.theme || 'minimal'
           });
         } else {
-           navigate('/create-profile', { replace: true });
+          navigate('/create-profile', { replace: true });
         }
       } catch (err) {
         console.error("Dashboard fetchData error:", err);
@@ -82,7 +82,7 @@ const Dashboard = () => {
     };
 
     if (!authLoading) {
-       fetchData();
+      fetchData();
     }
   }, [user, authLoading, navigate]);
 
@@ -96,33 +96,32 @@ const Dashboard = () => {
   }
 
   if (!profileData) {
-     return null; 
+    return null;
   }
 
   return (
     <div className="flex h-screen bg-ethereal overflow-hidden font-body text-zinc-900">
-      
+
       {/* Sidebar (Clean White Pill-based) */}
       <aside className="hidden md:flex flex-col w-[280px] bg-white z-20 shrink-0">
         <div className="h-24 flex items-center px-10">
-           <img src="/portid-logo.png" alt="Portid" className="h-10 w-auto object-contain scale-[2.2] origin-left" />
+          <img src="/portid-logo.png" alt="Portid" className="h-10 w-auto object-contain scale-[2.2] origin-left" />
         </div>
 
         <div className="flex-1 overflow-y-auto no-scrollbar py-4 px-6 space-y-0.5">
           <p className="px-4 text-[11px] font-bold text-zinc-400 mb-3">Menu</p>
-          
+
           {SIDEBAR_NAV.map((item) => (
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center gap-4 px-5 py-2.5 rounded-full text-[13.5px] font-bold transition-all ${
-                activeTab === item.id 
-                  ? 'bg-orange-500 text-white shadow-[0_8px_20px_rgba(249,115,22,0.25)]' 
+              className={`w-full flex items-center gap-4 px-5 py-2.5 rounded-full text-[13.5px] font-bold transition-all ${activeTab === item.id
+                  ? 'bg-orange-500 text-white shadow-[0_8px_20px_rgba(249,115,22,0.25)]'
                   : 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900'
-              }`}
+                }`}
             >
               <div className={`p-1.5 rounded-full ${activeTab === item.id ? 'bg-white/20' : 'bg-zinc-100/80 text-orange-500 group-hover:bg-zinc-200'}`}>
-                 <item.icon className={`h-4 w-4 ${activeTab === item.id ? 'text-white' : ''}`} />
+                <item.icon className={`h-4 w-4 ${activeTab === item.id ? 'text-white' : ''}`} />
               </div>
               {item.label}
             </button>
@@ -134,61 +133,61 @@ const Dashboard = () => {
             className="w-full flex items-center gap-4 px-5 py-2.5 rounded-full text-[13.5px] font-bold text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 transition-all text-left"
           >
             <div className="p-1.5 rounded-full bg-zinc-100/80 text-orange-500 group-hover:bg-zinc-200">
-               <QrCode className="h-4 w-4" />
+              <QrCode className="h-4 w-4" />
             </div>
             QR Generator
           </button>
         </div>
 
         <div className="p-6 space-y-2">
-           <p className="px-4 text-[11px] font-bold text-zinc-400 mb-4">Settings</p>
-           <button onClick={() => navigate('/pricing')} className="w-full flex items-center gap-4 px-5 py-3.5 rounded-full text-[13.5px] font-bold text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 transition-all">
-             <div className="p-1.5 rounded-full bg-zinc-100/80 text-orange-500"><Settings className="h-4 w-4" /></div> 
-             Billing & Plan
-           </button>
-           
-           <div className="pt-4">
-             <button onClick={handleSignOut} className="w-max flex items-center gap-2 px-6 py-2.5 rounded-full text-[13px] font-bold text-white bg-indigo-500 hover:bg-indigo-600 shadow-[0_8px_20px_rgba(99,102,241,0.25)] transition-all">
-               Signout
-             </button>
-           </div>
+          <p className="px-4 text-[11px] font-bold text-zinc-400 mb-4">Settings</p>
+          <button onClick={() => navigate('/pricing')} className="w-full flex items-center gap-4 px-5 py-3.5 rounded-full text-[13.5px] font-bold text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 transition-all">
+            <div className="p-1.5 rounded-full bg-zinc-100/80 text-orange-500"><Settings className="h-4 w-4" /></div>
+            Billing & Plan
+          </button>
+
+          <div className="pt-4">
+            <button onClick={handleSignOut} className="w-max flex items-center gap-2 px-6 py-2.5 rounded-full text-[13px] font-bold text-white bg-indigo-500 hover:bg-indigo-600 shadow-[0_8px_20px_rgba(99,102,241,0.25)] transition-all">
+              Signout
+            </button>
+          </div>
         </div>
       </aside>
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
-        
+
         {/* Floating Top Header (Desktop) */}
         <header className="hidden md:flex items-center justify-end px-8 py-6 shrink-0">
-           <div className="flex items-center gap-4">
-              {/* Wallet/Live View Pill */}
-              <a 
-                href={`/p/${profileData.slug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-full font-bold text-[13px] shadow-[0_8px_20px_rgba(37,99,235,0.25)] hover:bg-blue-700 transition-all"
-              >
-                <Globe className="h-4 w-4 opacity-80" />
-                Live Profile <ExternalLink className="h-3 w-3 opacity-60 ml-1" />
-              </a>
+          <div className="flex items-center gap-4">
+            {/* Wallet/Live View Pill */}
+            <a
+              href={`/p/${profileData.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-full font-bold text-[13px] shadow-[0_8px_20px_rgba(37,99,235,0.25)] hover:bg-blue-700 transition-all"
+            >
+              <Globe className="h-4 w-4 opacity-80" />
+              Live Profile <ExternalLink className="h-3 w-3 opacity-60 ml-1" />
+            </a>
 
-              {/* Notification Bell */}
-              <button className="h-11 w-11 flex items-center justify-center bg-white rounded-full shadow-sm border border-white/50 text-zinc-600 hover:text-orange-500 transition-colors relative">
-                <Bell className="h-5 w-5" />
-                <span className="absolute top-3 right-3 h-2 w-2 bg-rose-500 rounded-full ring-2 ring-white"></span>
-              </button>
+            {/* Notification Bell */}
+            <button className="h-11 w-11 flex items-center justify-center bg-white rounded-full shadow-sm border border-white/50 text-zinc-600 hover:text-orange-500 transition-colors relative">
+              <Bell className="h-5 w-5" />
+              <span className="absolute top-3 right-3 h-2 w-2 bg-rose-500 rounded-full ring-2 ring-white"></span>
+            </button>
 
-              {/* User Avatar */}
-              <div className="flex items-center gap-3 bg-white p-1.5 pr-5 rounded-full shadow-sm border border-white/50 ml-2">
-                <div className="h-8 w-8 rounded-full bg-orange-100 flex items-center justify-center overflow-hidden">
-                  <User className="h-4 w-4 text-orange-500" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[12px] font-bold text-zinc-900 leading-none">Your Account</span>
-                  <span className="text-[10px] font-medium text-zinc-500 mt-0.5">{user?.email?.split('@')[0]}</span>
-                </div>
+            {/* User Avatar */}
+            <div className="flex items-center gap-3 bg-white p-1.5 pr-5 rounded-full shadow-sm border border-white/50 ml-2">
+              <div className="h-8 w-8 rounded-full bg-orange-100 flex items-center justify-center overflow-hidden">
+                <User className="h-4 w-4 text-orange-500" />
               </div>
-           </div>
+              <div className="flex flex-col">
+                <span className="text-[12px] font-bold text-zinc-900 leading-none">Your Account</span>
+                <span className="text-[10px] font-medium text-zinc-500 mt-0.5">{user?.email?.split('@')[0]}</span>
+              </div>
+            </div>
+          </div>
         </header>
 
         {/* Mobile Header */}
@@ -196,10 +195,10 @@ const Dashboard = () => {
           <div className="flex items-center gap-3">
             <img src="/portid-logo.png" alt="Portid" className="h-9 w-auto object-contain scale-[2.0] origin-left" />
           </div>
-          
+
           <div className="flex items-center gap-3">
             {/* Live profile link on mobile */}
-            <a 
+            <a
               href={`/p/${profileData.slug}`}
               target="_blank"
               rel="noopener noreferrer"
@@ -210,14 +209,14 @@ const Dashboard = () => {
             </a>
 
             {/* QR Generator Trigger */}
-            <button 
+            <button
               onClick={() => setIsQrOpen(true)}
               className="flex h-9 w-9 items-center justify-center bg-orange-50 text-orange-500 rounded-full border border-orange-100 hover:bg-orange-100 active:scale-95 transition-all shadow-sm"
               title="QR Generator"
             >
               <QrCode className="h-4.5 w-4.5" />
             </button>
-            
+
             {/* User Avatar Action Menu Pill */}
             <button
               onClick={() => setIsProfileDrawerOpen(true)}
@@ -233,7 +232,7 @@ const Dashboard = () => {
 
         {/* Content Scroll Area with mobile bottom-padding */}
         <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-32 md:pb-8">
-          
+
           {activeTab === 'overview' ? (
             <ProfileAnalytics embedded={true} profileId={profileData.id} />
           ) : (
@@ -318,11 +317,10 @@ const Dashboard = () => {
               {/* Info Cards (Active Plan Tier Badge) */}
               <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 mb-6 flex items-center justify-between">
                 <span className="text-xs font-extrabold text-zinc-500 uppercase tracking-wider">Plan Status</span>
-                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                  planTier === 'premium' 
-                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md' 
+                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${planTier === 'premium'
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md'
                     : 'bg-zinc-200 text-zinc-600'
-                }`}>
+                  }`}>
                   {planTier || 'Basic'}
                 </span>
               </div>
@@ -330,7 +328,7 @@ const Dashboard = () => {
               {/* Quick Actions List */}
               <div className="flex-1 space-y-3">
                 <p className="text-[10px] font-black uppercase tracking-wider text-zinc-400 mb-2 px-1">Quick Actions</p>
-                
+
                 <a
                   href={`/p/${profileData.slug}`}
                   target="_blank"
