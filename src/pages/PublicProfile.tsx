@@ -196,6 +196,16 @@ const PublicProfile = () => {
     fetchProfile();
   }, [slug]);
 
+  useEffect(() => {
+    if (profile) {
+      document.title = `${profile.brand_name} | Portid`;
+      const metaDesc = document.querySelector('meta[name="description"]');
+      if (metaDesc) {
+        metaDesc.setAttribute('content', profile.tagline || profile.description || 'View this Portid profile.');
+      }
+    }
+  }, [profile]);
+
   const trackClick = async (buttonName: string) => {
     if (!profile) return;
     await supabase.from('analytics').insert({

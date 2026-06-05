@@ -1,5 +1,11 @@
 {
+  "functions": {
+    "api/profile.js": {
+      "includeFiles": "dist/index.html"
+    }
+  },
   "rewrites": [
+    { "source": "/p/:slug", "destination": "/api/profile?slug=:slug" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

@@ -12,7 +12,7 @@ export interface AuthContextType {
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
   verifyOtp: (email: string, token: string, type: 'signup' | 'recovery' | 'magiclink' | 'email_change') => Promise<{ error: Error | null }>;
-  resendOtp: (email: string, type: 'signup' | 'recovery' | 'email_change') => Promise<{ error: Error | null }>;
+  resendOtp: (email: string, type: 'signup' | 'email_change') => Promise<{ error: Error | null }>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);

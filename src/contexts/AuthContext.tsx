@@ -152,7 +152,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error: error as Error | null };
   };
 
-  const resendOtp = async (email: string, type: 'signup' | 'recovery' | 'email_change') => {
+  const resendOtp = async (email: string, type: 'signup' | 'email_change') => {
     const { error } = await supabase.auth.resend({
       type,
       email,
