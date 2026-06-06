@@ -113,6 +113,8 @@ const EditProfile = ({ passedId, forcedTab, embedded = false }: { passedId?: str
   const [newMediaFiles, setNewMediaFiles] = useState<File[]>([]);
   const [newMediaPreviews, setNewMediaPreviews] = useState<string[]>([]);
   const [deletedMediaIds, setDeletedMediaIds] = useState<string[]>([]);
+  const [deletedMediaUrls, setDeletedMediaUrls] = useState<string[]>([]);
+  const [deletedProductImageUrls, setDeletedProductImageUrls] = useState<string[]>([]);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -200,6 +202,15 @@ const EditProfile = ({ passedId, forcedTab, embedded = false }: { passedId?: str
     updateForm({ hide_watermark: !form.hide_watermark });
   };
 
+  const getStoragePathFromUrl = (url: string): string | null => {
+    if (!url) return null;
+    const parts = url.split('/storage/v1/object/public/profile-assets/');
+    if (parts.length > 1) {
+      return parts[1];
+    }
+    return null;
+  };
+
   const handleSave = async () => {
     if (planTier !== 'premium') {
       const activeCount = getActiveLinksCount(form);
@@ -217,6 +228,15 @@ const EditProfile = ({ passedId, forcedTab, embedded = false }: { passedId?: str
         const path = `${user?.id}/${id}/logo-${Date.now()}.webp`;
         const { error: uploadError } = await supabase.storage.from('profile-assets').upload(path, compressedLogo, { upsert: true, contentType: 'image/webp' });
         if (uploadError) throw uploadError;
+
+        // Clean up the old logo if it exists in storage
+        if (form.logo_url) {
+          const oldPath = getStoragePathFromUrl(form.logo_url);
+          if (oldPath) {
+            await supabase.storage.from('profile-assets').remove([oldPath]);
+          }
+        }
+
         const { data: { publicUrl } } = supabase.storage.from('profile-assets').getPublicUrl(path);
         logo_url = publicUrl;
       }
@@ -227,6 +247,15 @@ const EditProfile = ({ passedId, forcedTab, embedded = false }: { passedId?: str
         const path = `${user?.id}/${id}/cover-${Date.now()}.webp`;
         const { error: uploadError } = await supabase.storage.from('profile-assets').upload(path, compressedCover, { upsert: true, contentType: 'image/webp' });
         if (uploadError) throw uploadError;
+
+        // Clean up the old cover if it exists in storage
+        if (form.cover_image_url) {
+          const oldPath = getStoragePathFromUrl(form.cover_image_url);
+          if (oldPath) {
+            await supabase.storage.from('profile-assets').remove([oldPath]);
+          }
+        }
+
         const { data: { publicUrl } } = supabase.storage.from('profile-assets').getPublicUrl(path);
         cover_image_url = publicUrl;
       }
@@ -240,6 +269,15 @@ const EditProfile = ({ passedId, forcedTab, embedded = false }: { passedId?: str
           const path = `${user?.id}/${id}/product-${prod.id}-${Date.now()}.webp`;
           const { error: pUploadError } = await supabase.storage.from('profile-assets').upload(path, compressedProd, { upsert: true, contentType: 'image/webp' });
           if (pUploadError) throw pUploadError;
+
+          // Clean up old product image if it exists in storage
+          if (prod.image_url) {
+            const oldPath = getStoragePathFromUrl(prod.image_url);
+            if (oldPath) {
+              await supabase.storage.from('profile-assets').remove([oldPath]);
+            }
+          }
+
           const { data: { publicUrl } } = supabase.storage.from('profile-assets').getPublicUrl(path);
           p_url = publicUrl;
         }
@@ -249,6 +287,16 @@ const EditProfile = ({ passedId, forcedTab, embedded = false }: { passedId?: str
           description: prod.description,
           image_url: p_url
         });
+      }
+
+      // Clean up deleted product images from storage
+      if (deletedProductImageUrls.length > 0) {
+        for (const url of deletedProductImageUrls) {
+          const oldPath = getStoragePathFromUrl(url);
+          if (oldPath) {
+            await supabase.storage.from('profile-assets').remove([oldPath]);
+          }
+        }
       }
 
       const { error: updateError } = await supabase
@@ -292,6 +340,14 @@ const EditProfile = ({ passedId, forcedTab, embedded = false }: { passedId?: str
       if (deletedMediaIds.length > 0) {
         const { error: deleteError } = await supabase.from('media').delete().in('id', deletedMediaIds);
         if (deleteError) throw deleteError;
+
+        // Clean up deleted media files from storage
+        for (const url of deletedMediaUrls) {
+          const oldPath = getStoragePathFromUrl(url);
+          if (oldPath) {
+            await supabase.storage.from('profile-assets').remove([oldPath]);
+          }
+        }
       }
 
       // Handle new media
@@ -319,6 +375,8 @@ const EditProfile = ({ passedId, forcedTab, embedded = false }: { passedId?: str
       setNewMediaFiles([]);
       setNewMediaPreviews([]);
       setDeletedMediaIds([]);
+      setDeletedMediaUrls([]);
+      setDeletedProductImageUrls([]);
 
       // Re-fetch media to update the gallery state correctly
       const { data: mediaData, error: mediaError } = await supabase
@@ -663,7 +721,7 @@ const EditProfile = ({ passedId, forcedTab, embedded = false }: { passedId?: str
                               {existingMedia.map((media) => (
                                 <div key={media.id} className="relative aspect-square rounded-2xl overflow-hidden shadow-sm group ring-2 ring-transparent hover:ring-zinc-900 transition-all">
                                   <img src={media.media_url} alt="" className="w-full h-full object-cover" />
-                                  <button onClick={() => { setDeletedMediaIds(prev => [...prev, media.id]); setExistingMedia(prev => prev.filter(m => m.id !== media.id)); setIsSaved(false); }} className="absolute inset-0 bg-red-600/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" >
+                                  <button onClick={() => { setDeletedMediaIds(prev => [...prev, media.id]); setDeletedMediaUrls(prev => [...prev, media.media_url]); setExistingMedia(prev => prev.filter(m => m.id !== media.id)); setIsSaved(false); }} className="absolute inset-0 bg-red-600/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" >
                                     <Trash2 className="h-5 w-5" />
                                   </button>
                                 </div>
@@ -1034,7 +1092,13 @@ const EditProfile = ({ passedId, forcedTab, embedded = false }: { passedId?: str
                                 >
                                   <button 
                                     type="button"
-                                    onClick={() => updateForm({ products: form.products.filter((_, i) => i !== index) })} 
+                                    onClick={() => {
+                                      const prodToDelete = form.products[index];
+                                      if (prodToDelete?.image_url) {
+                                        setDeletedProductImageUrls(prev => [...prev, prodToDelete.image_url]);
+                                      }
+                                      updateForm({ products: form.products.filter((_, i) => i !== index) });
+                                    }} 
                                     className="absolute right-3.5 top-3.5 p-1.5 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                                   >
                                     <X className="h-4 w-4" />
