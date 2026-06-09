@@ -220,11 +220,13 @@ const Pricing = () => {
               </div>
               <div className="flex items-baseline gap-1">
                 <span className="text-4xl font-black text-white">
-                  {billingCycle === 'monthly' ? '₹149' : '₹125'}
+                  {billingCycle === 'monthly' ? '₹149' : '₹1,499'}
                 </span>
-                <span className="text-zinc-500 text-sm font-bold">/month</span>
+                <span className="text-zinc-500 text-sm font-bold">
+                  {billingCycle === 'monthly' ? '/month' : '/year'}
+                </span>
               </div>
-              {billingCycle === 'yearly' && <p className="text-emerald-500 text-[10px] font-bold mt-1">₹1,499 Billed Yearly</p>}
+              {billingCycle === 'yearly' && <p className="text-emerald-500 text-[10px] font-bold mt-1">Billed annually (Save ₹289/year)</p>}
             </div>
             <ul className="space-y-4 mb-10 flex-1">
               {[
