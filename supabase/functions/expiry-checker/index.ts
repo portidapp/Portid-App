@@ -42,18 +42,40 @@ serve(async (req) => {
     const warning3Days: any[] = []
     const warning1Day: any[] = []
 
-    for (const plan of plans || []) {
-      const expiresAt = new Date(plan.expires_at)
-      const diffMs = expiresAt.getTime() - now.getTime()
-      const diffDays = diffMs / (1000 * 60 * 60 * 24)
+    const testUserId = urlObj.searchParams.get("test_user_id")
 
-      // Expiring in 2-3 days (exactly 3 days before, daily check catches it)
-      if (diffDays >= 2.0 && diffDays <= 3.0) {
-        warning3Days.push(plan)
-      } 
-      // Expiring in 0-1 day (exactly 1 day before)
-      else if (diffDays >= 0.0 && diffDays <= 1.0) {
-        warning1Day.push(plan)
+    if (testUserId) {
+      console.log(`Test mode active for user: ${testUserId}`)
+      const existingPlan = plans?.find(p => p.user_id === testUserId)
+      const basePlan = existingPlan || {
+        user_id: testUserId,
+        plan_tier: 'premium',
+        billing_cycle: 'manual'
+      }
+      
+      // Inject simulated expiries to trigger both templates
+      warning3Days.push({
+        ...basePlan,
+        expires_at: new Date(Date.now() + 2.5 * 24 * 60 * 60 * 1000).toISOString()
+      })
+      warning1Day.push({
+        ...basePlan,
+        expires_at: new Date(Date.now() + 0.5 * 24 * 60 * 60 * 1000).toISOString()
+      })
+    } else {
+      for (const plan of plans || []) {
+        const expiresAt = new Date(plan.expires_at)
+        const diffMs = expiresAt.getTime() - now.getTime()
+        const diffDays = diffMs / (1000 * 60 * 60 * 24)
+
+        // Expiring in 2-3 days (exactly 3 days before, daily check catches it)
+        if (diffDays >= 2.0 && diffDays <= 3.0) {
+          warning3Days.push(plan)
+        } 
+        // Expiring in 0-1 day (exactly 1 day before)
+        else if (diffDays >= 0.0 && diffDays <= 1.0) {
+          warning1Day.push(plan)
+        }
       }
     }
 
