@@ -90,16 +90,16 @@ serve(async (req) => {
         })
 
         const subject = daysLeft === 3
-          ? `Action Required: Your Portid Pro Plan is expiring in 3 days! ⏳`
-          : `Urgent: Your Portid Pro Plan expires tomorrow! ⚠️`
+          ? `Your Portid Pro plan is expiring in 3 days`
+          : `Your Portid Pro plan expires tomorrow`
 
         const titleText = daysLeft === 3
           ? `Renew Your Pro Plan`
           : `Your Pro Plan Expires Tomorrow`
 
         const warningMessage = daysLeft === 3
-          ? `Your Portid premium plan will expire on <strong>${expiresAtStr}</strong>. Renew your plan today to continue enjoying your premium setup without interruption.`
-          : `Your premium plan expires tomorrow on <strong>${expiresAtStr}</strong>. Renew the plan now for continued setup and to maintain all of your premium layouts.`
+          ? `Your Portid premium plan will expire on <strong>${expiresAtStr}</strong>. Renew your plan to continue enjoying your premium setup without interruption.`
+          : `Your premium plan expires tomorrow on <strong>${expiresAtStr}</strong>. Renew your plan to continue enjoying your premium setup without interruption.`
 
         const htmlContent = `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #070708; padding: 50px 20px; color: #fafafa; margin: 0;">
@@ -165,7 +165,7 @@ serve(async (req) => {
             'Authorization': `Bearer ${RESEND_API_KEY}`,
           },
           body: JSON.stringify({
-            from: 'Portid Billing <info@portid.in>',
+            from: 'Portid <info@portid.in>',
             to: [email],
             subject: subject,
             html: htmlContent

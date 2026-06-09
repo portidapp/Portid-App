@@ -295,7 +295,7 @@ serve(async (req) => {
               'Authorization': `Bearer ${Deno.env.get('RESEND_API_KEY')}`,
             },
             body: JSON.stringify({
-              from: 'Portid Billing <info@portid.in>',
+              from: 'Portid <info@portid.in>',
               to: [ownerEmail],
               subject: `Thank you for upgrading to Pro! 🚀`,
               html: htmlContent
