@@ -184,12 +184,16 @@ serve(async (req) => {
 
       const { error: dbError } = await supabaseAdmin
         .from('user_plans')
-        .upsert({
-          user_id: user.id,
-          plan_tier: 'premium',
-          expires_at: expiresAt.toISOString(),
-          updated_at: new Date().toISOString()
-        })
+        .upsert(
+          {
+            user_id: user.id,
+            plan_tier: 'premium',
+            billing_cycle: billingCycle,
+            expires_at: expiresAt.toISOString(),
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'user_id' }
+        )
 
       if (dbError) {
         console.error("Database update error:", dbError.message)
@@ -197,6 +201,111 @@ serve(async (req) => {
       }
 
       console.log("Successfully updated plan to premium for user:", user.id)
+
+      // Send Upgrade Confirmation Email
+      try {
+        console.log("Fetching owner email for user_id:", user.id)
+        const { data: userData, error: uErr } = await supabaseAdmin.auth.admin.getUserById(user.id)
+        const ownerEmail = userData?.user?.email
+
+        const { data: profile } = await supabaseAdmin
+          .from('profiles')
+          .select('brand_name, slug')
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        if (ownerEmail) {
+          const brandName = profile?.brand_name || 'Member'
+          const expiresAtStr = expiresAt.toLocaleString(undefined, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+          
+          console.log(`Sending Upgrade Confirmation Email to ${ownerEmail}...`)
+          const htmlContent = `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #070708; padding: 50px 20px; color: #fafafa; margin: 0;">
+              <div style="max-width: 600px; margin: 0 auto; background-color: #0c0c0e; border: 1px solid #27272a; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                
+                <!-- Header -->
+                <div style="background: linear-gradient(135deg, #f97316 0%, #d97706 100%); padding: 40px 40px; text-align: center; position: relative;">
+                  <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 950; letter-spacing: -0.5px; text-transform: uppercase;">You're Pro! 🚀</h1>
+                  <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px; font-weight: bold;">Upgrade Confirmation</p>
+                </div>
+                
+                <!-- Body -->
+                <div style="padding: 40px;">
+                  <h2 style="color: #ffffff; font-size: 18px; font-weight: 800; margin-top: 0; margin-bottom: 16px;">Hello ${brandName},</h2>
+                  
+                  <p style="color: #d4d4d8; font-size: 15px; line-height: 26px; margin: 0 0 24px 0;">
+                    Thank you for upgrading to the <strong>Portid Pro Plan</strong>! Your payment was processed successfully. 
+                    Your account has been upgraded with all premium layout controls, transparent QR codes, custom themes, lead forms, and unlimited link capabilities.
+                  </p>
+                  
+                  <!-- Expiry details box -->
+                  <div style="background-color: #18181b; border: 1px solid #27272a; padding: 20px; border-radius: 16px; margin-bottom: 30px;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
+                      <tr>
+                        <td style="padding: 6px 0; color: #71717a; font-weight: bold;">Plan Level:</td>
+                        <td style="padding: 6px 0; color: #f97316; font-weight: bold; text-transform: uppercase;">Pro Plan</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; color: #71717a; font-weight: bold;">Billing Cycle:</td>
+                        <td style="padding: 6px 0; color: #ffffff; font-weight: bold; text-transform: capitalize;">${billingCycle} upgrade</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; color: #71717a; font-weight: bold;">Expiration Time:</td>
+                        <td style="padding: 6px 0; color: #ffffff; font-weight: bold;">${expiresAtStr}</td>
+                      </tr>
+                    </table>
+                  </div>
+
+                  <h3 style="color: #ffffff; font-size: 15px; font-weight: 800; margin-top: 0; margin-bottom: 12px; border-left: 3px solid #f97316; padding-left: 10px;">Pro Plan Benefits</h3>
+                  <ul style="color: #a1a1aa; font-size: 13.5px; line-height: 22px; padding-left: 20px; margin: 0 0 30px 0;">
+                    <li style="margin-bottom: 6px;">Add unlimited custom buttons and custom contact links.</li>
+                    <li style="margin-bottom: 6px;">Upload images and video showcases in your media gallery.</li>
+                    <li style="margin-bottom: 6px;">Access Design Studio and create custom theme styles.</li>
+                    <li style="margin-bottom: 6px;">Enable lead contact forms and appointment booking.</li>
+                    <li style="margin-bottom: 6px;">Remove the "Powered by Portid" logo watermark from your profile card.</li>
+                  </ul>
+
+                  <!-- Button CTA -->
+                  <div style="text-align: center; margin-bottom: 10px;">
+                    <a href="https://portid.in/dashboard" target="_blank" style="background-color: #f97316; color: #ffffff; padding: 14px 28px; border-radius: 12px; font-size: 14px; font-weight: 800; text-decoration: none; display: inline-block; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);">
+                      Go to Your Dashboard
+                    </a>
+                  </div>
+                </div>
+                
+                <!-- Footer -->
+                <div style="background-color: #121214; padding: 24px; text-align: center; border-top: 1px solid #1f1f23;">
+                  <p style="margin: 0; font-size: 11px; color: #71717a;">You received this because you upgraded your Portid subscription.</p>
+                  <p style="margin: 6px 0 0 0; font-size: 11px; color: #71717a;">© ${new Date().getFullYear()} Portid. All rights reserved.</p>
+                </div>
+              </div>
+            </div>
+          `
+
+          await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('RESEND_API_KEY')}`,
+            },
+            body: JSON.stringify({
+              from: 'Portid Billing <info@portid.in>',
+              to: [ownerEmail],
+              subject: `Thank you for upgrading to Pro! 🚀`,
+              html: htmlContent
+            })
+          })
+          console.log("Upgrade Confirmation Email dispatched successfully to:", ownerEmail)
+        }
+      } catch (mailErr: any) {
+        console.error("Failed to send upgrade confirmation email:", mailErr.message)
+      }
 
       return new Response(
         JSON.stringify({ success: true, message: "Subscription activated successfully!" }),

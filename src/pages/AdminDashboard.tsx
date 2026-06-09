@@ -28,6 +28,7 @@ interface Profile {
   user_id: string;
   created_at: string;
   is_premium: boolean;
+  email?: string | null;
 }
 
 interface UserRole {
@@ -47,6 +48,8 @@ interface AnalyticsEvent {
 interface UserPlan {
   user_id: string;
   plan_tier: 'basic' | 'premium';
+  expires_at: string | null;
+  billing_cycle: 'monthly' | 'yearly' | 'manual' | null;
 }
 
 interface SupportEnquiry {
@@ -73,11 +76,23 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   // Controls
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'profiles' | 'analytics' | 'enquiries'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'profiles' | 'analytics' | 'enquiries' | 'subscriptions'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [enquiryFilter, setEnquiryFilter] = useState<'all' | 'pending' | 'seen' | 'resolved'>('all');
+
+  // Subscription filters
+  const [subStatusFilter, setSubStatusFilter] = useState<'all' | 'active' | 'expiring' | 'expired' | 'lifetime'>('all');
+  const [subCycleFilter, setSubCycleFilter] = useState<'all' | 'monthly' | 'yearly' | 'manual'>('all');
+  const [subTierFilter, setSubTierFilter] = useState<'all' | 'basic' | 'premium'>('all');
+
+  // Manage plan modal controls
+  const [managePlanUser, setManagePlanUser] = useState<string | null>(null);
+  const [managePlanTier, setManagePlanTier] = useState<'basic' | 'premium'>('basic');
+  const [managePlanCycle, setManagePlanCycle] = useState<'monthly' | 'yearly' | 'manual' | 'none'>('none');
+  const [managePlanExpiryOption, setManagePlanExpiryOption] = useState<'lifetime' | '30days' | '365days' | 'custom'>('lifetime');
+  const [managePlanCustomExpiry, setManagePlanCustomExpiry] = useState<string>('');
 
   useEffect(() => {
     fetchAll();
@@ -86,9 +101,9 @@ const AdminDashboard = () => {
   const fetchAll = async () => {
     try {
       const [profilesRes, usersRes, plansRes, analyticsRes, enquiriesRes] = await Promise.all([
-        supabase.from('profiles').select('id, brand_name, slug, category, theme, layout, logo_url, user_id, created_at, is_premium').order('created_at', { ascending: false }),
+        supabase.from('profiles').select('id, brand_name, slug, category, theme, layout, logo_url, user_id, created_at, is_premium, email').order('created_at', { ascending: false }),
         supabase.from('user_roles').select('*').order('user_id'),
-        supabase.from('user_plans').select('user_id, plan_tier'),
+        supabase.from('user_plans').select('user_id, plan_tier, expires_at, billing_cycle'),
         supabase.from('analytics').select('*').order('created_at', { ascending: false }).limit(1000),
         supabase.from('support_enquiries').select('*').order('created_at', { ascending: false }),
       ]);
@@ -118,10 +133,32 @@ const AdminDashboard = () => {
     setProfiles(prev => prev.filter(p => p.id !== id));
   };
 
-  const handleUpdatePlan = async (userId: string, newTier: 'basic' | 'premium') => {
+  const handleUpdatePlan = async (
+    userId: string, 
+    newTier: 'basic' | 'premium',
+    billingCycle?: 'monthly' | 'yearly' | 'manual' | null,
+    expiresAt?: string | null
+  ) => {
+    const existing = userPlans.find(p => p.user_id === userId);
+    
+    // Resolve billing cycle and expires_at if not explicitly provided
+    const resolvedCycle = billingCycle !== undefined 
+      ? billingCycle 
+      : (newTier === 'basic' ? null : (existing?.billing_cycle || 'manual'));
+      
+    const resolvedExpiresAt = expiresAt !== undefined 
+      ? expiresAt 
+      : (newTier === 'basic' ? null : (existing?.expires_at || null));
+
     const { error } = await supabase
       .from('user_plans')
-      .upsert({ user_id: userId, plan_tier: newTier }, { onConflict: 'user_id' });
+      .upsert({ 
+        user_id: userId, 
+        plan_tier: newTier,
+        billing_cycle: resolvedCycle,
+        expires_at: resolvedExpiresAt,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
 
     if (error) {
       toast.error(error.message);
@@ -130,10 +167,16 @@ const AdminDashboard = () => {
     toast.success(`User plan updated to ${newTier.toUpperCase()}`);
     setUserPlans(prev => {
       const exists = prev.some(p => p.user_id === userId);
+      const updatedItem: UserPlan = { 
+        user_id: userId, 
+        plan_tier: newTier, 
+        billing_cycle: resolvedCycle, 
+        expires_at: resolvedExpiresAt 
+      };
       if (exists) {
-        return prev.map(p => p.user_id === userId ? { ...p, plan_tier: newTier } : p);
+        return prev.map(p => p.user_id === userId ? { ...p, ...updatedItem } : p);
       } else {
-        return [...prev, { user_id: userId, plan_tier: newTier }];
+        return [...prev, updatedItem];
       }
     });
   };
@@ -284,6 +327,98 @@ const AdminDashboard = () => {
     return true;
   });
 
+  const resolvedSubscriptions = users.map(u => {
+    const plan = userPlans.find(p => p.user_id === u.user_id);
+    const profile = profiles.find(p => p.user_id === u.user_id);
+    
+    // Calculate expiration info
+    const expiresAt = plan?.expires_at ? new Date(plan.expires_at) : null;
+    const isExpired = expiresAt ? expiresAt.getTime() < Date.now() : false;
+    const isLifetime = plan?.plan_tier === 'premium' && !expiresAt;
+    
+    let status: 'active' | 'expiring' | 'expired' | 'basic' = 'basic';
+    let daysRemaining: number | null = null;
+    let timeString = '';
+    
+    if (plan?.plan_tier === 'premium') {
+      if (isLifetime) {
+        status = 'active';
+      } else if (expiresAt) {
+        const diffMs = expiresAt.getTime() - Date.now();
+        daysRemaining = diffMs / (1000 * 60 * 60 * 24);
+        
+        if (isExpired) {
+          status = 'expired';
+        } else if (daysRemaining <= 7) {
+          status = 'expiring';
+        } else {
+          status = 'active';
+        }
+        
+        if (isExpired) {
+          const agoDays = Math.abs(Math.floor(daysRemaining));
+          timeString = agoDays === 0 ? "Expired today" : `Expired ${agoDays}d ago`;
+        } else {
+          const leftDays = Math.floor(daysRemaining);
+          const leftHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+          if (leftDays === 0) {
+            timeString = `${leftHours}h left`;
+          } else {
+            timeString = `${leftDays}d, ${leftHours}h left`;
+          }
+        }
+      }
+    }
+    
+    return {
+      userId: u.user_id,
+      role: u.role,
+      planTier: plan?.plan_tier || 'basic',
+      billingCycle: plan?.billing_cycle || null,
+      expiresAt: plan?.expires_at || null,
+      profile,
+      status,
+      daysRemaining,
+      timeString,
+      isLifetime
+    };
+  });
+
+  // Filtered Subscriptions
+  const filteredSubscriptions = resolvedSubscriptions.filter(s => {
+    // Search query matches User ID, Email, Brand Name, or Slug
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const matchUserId = s.userId.toLowerCase().includes(query);
+      const matchBrandName = s.profile?.brand_name?.toLowerCase()?.includes(query) || false;
+      const matchSlug = s.profile?.slug?.toLowerCase()?.includes(query) || false;
+      const matchEmail = s.profile?.email?.toLowerCase()?.includes(query) || false;
+      if (!matchUserId && !matchBrandName && !matchSlug && !matchEmail) return false;
+    }
+    
+    // Status filter
+    if (subStatusFilter !== 'all') {
+      if (subStatusFilter === 'active' && (s.planTier !== 'premium' || s.status === 'expired')) return false;
+      if (subStatusFilter === 'expiring' && s.status !== 'expiring') return false;
+      if (subStatusFilter === 'expired' && s.status !== 'expired') return false;
+      if (subStatusFilter === 'lifetime' && (!s.isLifetime || s.planTier !== 'premium')) return false;
+    }
+    
+    // Cycle filter
+    if (subCycleFilter !== 'all' && s.billingCycle !== subCycleFilter) return false;
+    
+    // Plan tier filter
+    if (subTierFilter !== 'all' && s.planTier !== subTierFilter) return false;
+    
+    return true;
+  });
+
+  // Calculate Metrics
+  const activePremiumCount = resolvedSubscriptions.filter(s => s.planTier === 'premium' && s.status !== 'expired').length;
+  const monthlyCount = resolvedSubscriptions.filter(s => s.planTier === 'premium' && s.status !== 'expired' && s.billingCycle === 'monthly').length;
+  const yearlyCount = resolvedSubscriptions.filter(s => s.planTier === 'premium' && s.status !== 'expired' && s.billingCycle === 'yearly').length;
+  const expiringSoonCount = resolvedSubscriptions.filter(s => s.planTier === 'premium' && s.status === 'expiring').length;
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950">
@@ -315,6 +450,7 @@ const AdminDashboard = () => {
           {[
             { id: 'dashboard', label: 'Overview', icon: Layout },
             { id: 'users', label: 'User Accounts', icon: Users },
+            { id: 'subscriptions', label: 'Subscriptions', icon: Crown },
             { id: 'profiles', label: 'Profiles DB', icon: User },
             { id: 'analytics', label: 'Analytics Engine', icon: BarChart3 },
           ].map((item) => (
@@ -394,6 +530,7 @@ const AdminDashboard = () => {
             >
               <option value="dashboard">Overview</option>
               <option value="users">Users Accounts</option>
+              <option value="subscriptions">Subscriptions</option>
               <option value="profiles">Profiles DB</option>
               <option value="analytics">Analytics Engine</option>
               <option value="enquiries">Help Desk</option>
@@ -1132,8 +1269,430 @@ const AdminDashboard = () => {
             </div>
           )}
 
+          {/* TAB: SUBSCRIPTIONS & PLANS MANAGEMENT */}
+          {activeTab === 'subscriptions' && (
+            <div className="space-y-8 animate-fade-in text-left">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+                {[
+                  { label: 'Active Premium Plans', count: activePremiumCount, icon: Crown, color: 'text-orange-500 bg-orange-500/10 border-orange-500/20' },
+                  { label: 'Monthly Upgrades', count: monthlyCount, icon: Calendar, color: 'text-blue-500 bg-blue-500/10 border-blue-500/20' },
+                  { label: 'Yearly Upgrades', count: yearlyCount, icon: Star, color: 'text-purple-500 bg-purple-500/10 border-purple-500/20' },
+                  { label: 'Near Expiry (< 7d)', count: expiringSoonCount, icon: ShieldAlert, color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' },
+                ].map((kpi, i) => (
+                  <Card key={i} className="border-zinc-900 bg-[#0c0c0e] rounded-2xl hover:border-zinc-800 transition-all shadow-md">
+                    <CardContent className="p-5 flex flex-col justify-between h-full text-left">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">{kpi.label}</span>
+                        <div className={`p-2 rounded-xl border ${kpi.color}`}>
+                          <kpi.icon className="h-4 w-4" />
+                        </div>
+                      </div>
+                      <p className="text-2xl font-black text-zinc-100 mt-6 tracking-tight">{kpi.count}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Filters Panel */}
+              <div className="bg-[#0c0c0e] border border-zinc-900 rounded-3xl p-6 flex flex-col gap-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="relative w-full max-w-sm">
+                    <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                    <Input
+                      placeholder="Search by ID, email, name or slug…"
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      className="pl-10 h-11 rounded-xl bg-zinc-900/50 border-zinc-900 focus:bg-zinc-900 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 text-sm font-semibold"
+                    />
+                  </div>
+                  <span className="text-xs font-black text-zinc-500 uppercase tracking-widest">
+                    Found {filteredSubscriptions.length} registered accounts
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-4 border-t border-zinc-900/50 pt-4">
+                  {/* Status filter */}
+                  <div className="flex flex-col gap-1.5 text-left">
+                    <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest ml-1">Plan Status</span>
+                    <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-900 gap-1 shrink-0">
+                      {[
+                        { id: 'all', label: 'All' },
+                        { id: 'active', label: 'Active Pro' },
+                        { id: 'expiring', label: 'Expiring Soon' },
+                        { id: 'expired', label: 'Expired' },
+                        { id: 'lifetime', label: 'Lifetime' },
+                      ].map((f) => (
+                        <button
+                          key={f.id}
+                          onClick={() => setSubStatusFilter(f.id as any)}
+                          className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${subStatusFilter === f.id
+                              ? 'bg-orange-500 text-white shadow-sm shadow-orange-500/20'
+                              : 'text-zinc-500 hover:text-zinc-300'
+                            }`}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Billing cycle filter */}
+                  <div className="flex flex-col gap-1.5 text-left">
+                    <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest ml-1">Billing Cycle</span>
+                    <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-900 gap-1 shrink-0">
+                      {[
+                        { id: 'all', label: 'All' },
+                        { id: 'monthly', label: 'Monthly' },
+                        { id: 'yearly', label: 'Yearly' },
+                        { id: 'manual', label: 'Manual' },
+                      ].map((f) => (
+                        <button
+                          key={f.id}
+                          onClick={() => setSubCycleFilter(f.id as any)}
+                          className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${subCycleFilter === f.id
+                              ? 'bg-orange-500 text-white shadow-sm shadow-orange-500/20'
+                              : 'text-zinc-500 hover:text-zinc-300'
+                            }`}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Tier filter */}
+                  <div className="flex flex-col gap-1.5 text-left">
+                    <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest ml-1">Tier</span>
+                    <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-900 gap-1 shrink-0">
+                      {[
+                        { id: 'all', label: 'All' },
+                        { id: 'premium', label: 'Premium' },
+                        { id: 'basic', label: 'Basic' },
+                      ].map((f) => (
+                        <button
+                          key={f.id}
+                          onClick={() => setSubTierFilter(f.id as any)}
+                          className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${subTierFilter === f.id
+                              ? 'bg-orange-500 text-white shadow-sm shadow-orange-500/20'
+                              : 'text-zinc-500 hover:text-zinc-300'
+                            }`}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Subscriptions Directory Table */}
+              <div className="overflow-hidden rounded-3xl border border-zinc-900 bg-[#0c0c0e] shadow-md">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm border-collapse">
+                    <thead className="bg-zinc-900/50 text-zinc-500 font-black uppercase text-[10px] tracking-wider border-b border-zinc-900">
+                      <tr>
+                        <th className="px-6 py-4.5">Account / Profile</th>
+                        <th className="px-6 py-4.5">Plan Level</th>
+                        <th className="px-6 py-4.5">Billing Cycle</th>
+                        <th className="px-6 py-4.5">Expiration Time</th>
+                        <th className="px-6 py-4.5">Time Remaining</th>
+                        <th className="px-6 py-4.5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-900">
+                      {filteredSubscriptions.map(sub => (
+                        <tr key={sub.userId} className="hover:bg-zinc-900/20 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              {sub.profile?.logo_url ? (
+                                <img src={sub.profile.logo_url} alt="" className="h-9 w-9 rounded-xl object-cover border border-zinc-800" />
+                              ) : (
+                                <div className="h-9 w-9 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center font-black text-xs border border-orange-500/10 shrink-0">
+                                  {sub.profile?.brand_name?.charAt(0) || sub.userId.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <span className="text-xs font-black text-zinc-100 block leading-tight truncate">
+                                  {sub.profile?.brand_name || 'Unpublished Profile'}
+                                </span>
+                                {sub.profile?.slug && (
+                                  <span className="text-[10px] font-extrabold text-zinc-500 block mt-0.5 uppercase tracking-wider truncate">
+                                    /{sub.profile?.slug}
+                                  </span>
+                                )}
+                                {sub.profile?.email && (
+                                  <span className="text-[9px] font-semibold text-zinc-500 block truncate">
+                                    {sub.profile?.email}
+                                  </span>
+                                )}
+                                <span className="font-mono text-[9px] text-zinc-600 block truncate mt-0.5" title="User ID">
+                                  ID: {sub.userId}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${sub.planTier === 'premium'
+                                ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm'
+                                : 'bg-zinc-800 text-zinc-500'
+                              }`}>
+                              {sub.planTier}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            {sub.planTier === 'premium' ? (
+                              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${
+                                sub.billingCycle === 'monthly' ? 'bg-blue-500/10 border border-blue-500/20 text-blue-400' :
+                                sub.billingCycle === 'yearly' ? 'bg-purple-500/10 border border-purple-500/20 text-purple-400' :
+                                'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+                              }`}>
+                                {sub.billingCycle || 'manual'}
+                              </span>
+                            ) : (
+                              <span className="text-zinc-600 font-semibold text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-xs font-semibold text-zinc-400">
+                            {sub.planTier === 'premium' ? (
+                              sub.isLifetime ? (
+                                <span className="text-amber-500 font-bold flex items-center gap-1"><Crown className="h-3.5 w-3.5 fill-amber-500/20" /> Lifetime</span>
+                              ) : sub.expiresAt ? (
+                                <span>{new Date(sub.expiresAt).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                              ) : (
+                                <span className="text-zinc-600">—</span>
+                              )
+                            ) : (
+                              <span className="text-zinc-600">No Expiration (Free)</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            {sub.planTier === 'premium' ? (
+                              sub.isLifetime ? (
+                                <span className="text-xs font-bold text-amber-500">Active Forever</span>
+                              ) : (
+                                <span className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                  sub.status === 'expired' ? 'bg-rose-500/10 text-rose-500' :
+                                  sub.status === 'expiring' ? 'bg-amber-500/10 text-amber-500 animate-pulse' :
+                                  'bg-emerald-500/10 text-emerald-500'
+                                }`}>
+                                  {sub.timeString}
+                                </span>
+                              )
+                            ) : (
+                              <span className="text-zinc-600 text-xs font-semibold">—</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setManagePlanUser(sub.userId);
+                                setManagePlanTier(sub.planTier);
+                                setManagePlanCycle(sub.billingCycle || (sub.planTier === 'premium' ? 'manual' : 'none'));
+                                setManagePlanExpiryOption(sub.isLifetime ? 'lifetime' : sub.expiresAt ? 'custom' : 'lifetime');
+                                if (sub.expiresAt) {
+                                  const dateObj = new Date(sub.expiresAt);
+                                  const offset = dateObj.getTimezoneOffset();
+                                  const localDate = new Date(dateObj.getTime() - offset * 60 * 1000);
+                                  setManagePlanCustomExpiry(localDate.toISOString().slice(0, 16));
+                                } else {
+                                  setManagePlanCustomExpiry('');
+                                }
+                              }}
+                              className="h-9 px-4 rounded-xl border-zinc-800 bg-zinc-900 text-xs font-black uppercase text-orange-500 hover:bg-zinc-800 hover:text-orange-400 transition-all shadow-sm"
+                            >
+                              Manage Plan
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredSubscriptions.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-20 text-center text-zinc-500 font-extrabold text-sm">
+                            No subscription plans match your active filters
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       </main>
+
+      {/* MANAGE PLAN MODAL OVERLAY */}
+      {managePlanUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-[#0c0c0e] border border-zinc-900 rounded-[2rem] w-full max-w-md p-8 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200 text-left">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-black text-zinc-100 uppercase tracking-wider flex items-center gap-2">
+                <Settings className="h-5 w-5 text-orange-500" /> Manage Account Plan
+              </h3>
+              <button 
+                onClick={() => setManagePlanUser(null)}
+                className="text-zinc-500 hover:text-zinc-300 text-xs font-black uppercase"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {/* User context info */}
+              <div className="p-4 bg-zinc-900/40 rounded-2xl border border-zinc-900">
+                <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Target Account (User ID)</p>
+                <p className="font-mono text-xs font-bold text-zinc-300 truncate mt-1">{managePlanUser}</p>
+                {(() => {
+                  const profile = profiles.find(p => p.user_id === managePlanUser);
+                  if (profile) {
+                    return (
+                      <div className="mt-2 text-xs font-semibold text-orange-500">
+                        Profile: <strong className="text-zinc-300">/{profile.slug}</strong> ({profile.brand_name})
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+
+              {/* Plan Tier Selection */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block ml-1">Plan Tier</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { id: 'basic', label: 'Basic (Free)' },
+                    { id: 'premium', label: 'Premium (Pro)' },
+                  ].map(t => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        setManagePlanTier(t.id as any);
+                        if (t.id === 'basic') {
+                          setManagePlanCycle('none');
+                        } else if (managePlanCycle === 'none') {
+                          setManagePlanCycle('manual');
+                        }
+                      }}
+                      className={`py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider border transition-all ${
+                        managePlanTier === t.id
+                          ? 'bg-orange-500/10 border-orange-500 text-orange-500'
+                          : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Billing Cycle Selection */}
+              {managePlanTier === 'premium' && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block ml-1">Billing Cycle</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'monthly', label: 'Monthly' },
+                      { id: 'yearly', label: 'Yearly' },
+                      { id: 'manual', label: 'Manual' },
+                    ].map(c => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setManagePlanCycle(c.id as any)}
+                        className={`py-2 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all ${
+                          managePlanCycle === c.id
+                            ? 'bg-orange-500/10 border-orange-500 text-orange-500'
+                            : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                        }`}
+                      >
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Expiration Settings */}
+              {managePlanTier === 'premium' && (
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block ml-1">Subscription Expiration</label>
+                  <select
+                    value={managePlanExpiryOption}
+                    onChange={(e) => setManagePlanExpiryOption(e.target.value as any)}
+                    className="w-full text-xs font-black bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-zinc-200 cursor-pointer focus:ring-1 focus:ring-orange-500 focus:outline-none"
+                  >
+                    <option value="lifetime">Lifetime (No Expiry)</option>
+                    <option value="30days">+30 Days (1 Month)</option>
+                    <option value="365days">+365 Days (1 Year)</option>
+                    <option value="custom">Custom Date & Time</option>
+                  </select>
+
+                  {managePlanExpiryOption === 'custom' && (
+                    <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                      <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest ml-1">Choose Date & Time</span>
+                      <input
+                        type="datetime-local"
+                        value={managePlanCustomExpiry}
+                        onChange={(e) => setManagePlanCustomExpiry(e.target.value)}
+                        className="w-full text-xs font-bold bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-zinc-200 focus:ring-1 focus:ring-orange-500 focus:outline-none"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Save/Cancel actions */}
+              <div className="flex gap-3 pt-4 border-t border-zinc-900">
+                <Button
+                  variant="outline"
+                  type="button"
+                  className="flex-1 h-11 rounded-xl border-zinc-800 bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 text-xs font-bold uppercase tracking-wider"
+                  onClick={() => setManagePlanUser(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="default"
+                  type="button"
+                  className="flex-1 h-11 rounded-xl bg-orange-500 text-white hover:bg-orange-600 text-xs font-bold uppercase tracking-wider shadow-lg shadow-orange-500/20"
+                  onClick={async () => {
+                    let expiryDate: string | null = null;
+                    if (managePlanTier === 'premium') {
+                      if (managePlanExpiryOption === '30days') {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 30);
+                        expiryDate = d.toISOString();
+                      } else if (managePlanExpiryOption === '365days') {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 365);
+                        expiryDate = d.toISOString();
+                      } else if (managePlanExpiryOption === 'custom') {
+                        if (!managePlanCustomExpiry) {
+                          toast.error("Please select a custom expiration date.");
+                          return;
+                        }
+                        expiryDate = new Date(managePlanCustomExpiry).toISOString();
+                      }
+                    }
+                    
+                    const cycle = managePlanTier === 'basic' ? null : (managePlanCycle === 'none' ? 'manual' : managePlanCycle);
+
+                    await handleUpdatePlan(managePlanUser, managePlanTier, cycle, expiryDate);
+                    setManagePlanUser(null);
+                  }}
+                >
+                  Save Settings
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

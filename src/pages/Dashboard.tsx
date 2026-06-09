@@ -15,7 +15,8 @@ import {
   Bell,
   ExternalLink,
   QrCode,
-  X
+  X,
+  HelpCircle
 } from 'lucide-react';
 import EditProfile from './EditProfile';
 import ProfileAnalytics from './ProfileAnalytics';
@@ -141,9 +142,19 @@ const Dashboard = () => {
 
         <div className="p-6 space-y-2">
           <p className="px-4 text-[11px] font-bold text-zinc-400 mb-4">Settings</p>
-          <button onClick={() => navigate('/pricing')} className="w-full flex items-center gap-4 px-5 py-3.5 rounded-full text-[13.5px] font-bold text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 transition-all">
+          <button onClick={() => navigate('/pricing')} className="w-full flex items-center gap-4 px-5 py-3.5 rounded-full text-[13.5px] font-bold text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 transition-all text-left">
             <div className="p-1.5 rounded-full bg-zinc-100/80 text-orange-500"><Settings className="h-4 w-4" /></div>
             Billing & Plan
+          </button>
+
+          <button 
+            onClick={() => window.dispatchEvent(new CustomEvent("open-support"))} 
+            className="w-full flex items-center gap-4 px-5 py-3.5 rounded-full text-[13.5px] font-bold text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 transition-all text-left"
+          >
+            <div className="p-1.5 rounded-full bg-zinc-100/80 text-orange-500">
+              <HelpCircle className="h-4 w-4" />
+            </div>
+            Help & Support
           </button>
 
           <div className="pt-4">
@@ -363,6 +374,17 @@ const Dashboard = () => {
                 >
                   <Settings className="h-4.5 w-4.5 text-orange-500" />
                   Billing & Plan
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsProfileDrawerOpen(false);
+                    window.dispatchEvent(new CustomEvent("open-support"));
+                  }}
+                  className="w-full flex items-center gap-3 p-4 rounded-2xl border border-zinc-200 text-zinc-700 hover:bg-zinc-50 font-extrabold text-[13px] transition-all text-left"
+                >
+                  <HelpCircle className="h-4.5 w-4.5 text-orange-500" />
+                  Help & Support
                 </button>
               </div>
 

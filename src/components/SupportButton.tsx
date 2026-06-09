@@ -7,9 +7,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useLocation } from "react-router-dom";
 
 export const SupportButton = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -20,6 +22,12 @@ export const SupportButton = () => {
   });
 
   useEffect(() => {
+    const handleOpen = () => setIsOpen(true);
+    window.addEventListener("open-support", handleOpen);
+    return () => window.removeEventListener("open-support", handleOpen);
+  }, []);
+
+  useEffect(() => {
     if (user) {
       setFormData(prev => ({
         ...prev,
@@ -28,6 +36,18 @@ export const SupportButton = () => {
       }));
     }
   }, [user]);
+
+  // Hide on public paths, admin dashboard, or if not logged in
+  const isPublicRoute = 
+    location.pathname === "/" || 
+    location.pathname.startsWith("/p/") || 
+    location.pathname === "/demo" ||
+    location.pathname.startsWith("/admin") ||
+    location.pathname === "/admin-login";
+
+  if (!user || isPublicRoute) {
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

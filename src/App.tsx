@@ -9,6 +9,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminRoute from "@/components/AdminRoute";
 import { PremiumLoader } from "@/components/PremiumLoader";
 import React, { Suspense, lazy } from 'react';
+import { SupportButton } from "@/components/SupportButton";
 
 // Lazy load all pages for optimal bundle splitting and performance
 const Landing = lazy(() => import("./pages/Landing"));
@@ -56,6 +57,7 @@ const App = () => (
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
+            <SupportButton />
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>
