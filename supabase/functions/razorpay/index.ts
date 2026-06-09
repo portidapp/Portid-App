@@ -99,8 +99,8 @@ serve(async (req) => {
 
       // Calculate amount in paise:
       // Monthly = ₹149 => 14900 paise
-      // Yearly = ₹1,490 => 149000 paise
-      const amount = billingCycle === "monthly" ? 14900 : 149000
+      // Yearly = ₹1,499 => 149900 paise
+      const amount = billingCycle === "monthly" ? 14900 : 149900
       console.log(`Creating Razorpay Order for cycle: ${billingCycle}, amount: ${amount} paise`)
 
       const receipt = `rcpt_${user.id.substring(0, 8)}_${Date.now()}`

@@ -163,7 +163,7 @@ const Pricing = () => {
               />
             </button>
             <span className={`text-sm font-bold transition-colors ${billingCycle === 'yearly' ? 'text-zinc-900' : 'text-zinc-400'}`}>
-              Yearly <span className="text-emerald-500 ml-1">(-33% Off)</span>
+              Yearly <span className="text-emerald-500 ml-1">(-16% Off)</span>
             </span>
           </div>
         </div>
@@ -220,11 +220,11 @@ const Pricing = () => {
               </div>
               <div className="flex items-baseline gap-1">
                 <span className="text-4xl font-black text-white">
-                  {billingCycle === 'monthly' ? '₹149' : '₹124'}
+                  {billingCycle === 'monthly' ? '₹149' : '₹125'}
                 </span>
                 <span className="text-zinc-500 text-sm font-bold">/month</span>
               </div>
-              {billingCycle === 'yearly' && <p className="text-emerald-500 text-[10px] font-bold mt-1">₹1,490 Billed Yearly</p>}
+              {billingCycle === 'yearly' && <p className="text-emerald-500 text-[10px] font-bold mt-1">₹1,499 Billed Yearly</p>}
             </div>
             <ul className="space-y-4 mb-10 flex-1">
               {[
