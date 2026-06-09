@@ -182,6 +182,46 @@ const CreateProfile = () => {
     sessionStorage.setItem('wizard_step', step.toString());
   }, [form, step]);
 
+  // Restore logo and cover files from sessionStorage on mount (for Google auth redirect restoration)
+  useEffect(() => {
+    const restoreFiles = async () => {
+      const logoBase64 = sessionStorage.getItem('wizard_logo_base64');
+      const coverBase64 = sessionStorage.getItem('wizard_cover_base64');
+      
+      const updates: any = {};
+      
+      if (logoBase64) {
+        try {
+          const res = await fetch(logoBase64);
+          const blob = await res.blob();
+          const file = new File([blob], 'logo.webp', { type: 'image/webp' });
+          updates.logo = file;
+          updates.logo_preview = URL.createObjectURL(file);
+        } catch (e) {
+          console.error("Error restoring logo:", e);
+        }
+      }
+      
+      if (coverBase64) {
+        try {
+          const res = await fetch(coverBase64);
+          const blob = await res.blob();
+          const file = new File([blob], 'cover.webp', { type: 'image/webp' });
+          updates.cover = file;
+          updates.cover_preview = URL.createObjectURL(file);
+        } catch (e) {
+          console.error("Error restoring cover:", e);
+        }
+      }
+      
+      if (Object.keys(updates).length > 0) {
+        setForm(prev => ({ ...prev, ...updates }));
+      }
+    };
+    
+    restoreFiles();
+  }, []);
+
 
 
   const SuccessOverlay = () => {
@@ -252,10 +292,45 @@ const CreateProfile = () => {
     );
   };
 
-  const handleFileChange = (field: 'logo' | 'cover', file: File | null) => {
+  const handleFileChange = async (field: 'logo' | 'cover', file: File | null) => {
     if (!file) return;
-    const preview = URL.createObjectURL(file);
-    updateForm({ [field]: file, [`${field}_preview`]: preview } as Partial<FormData>);
+    
+    // Immediately show the local uncompressed preview for fast feedback
+    const localPreview = URL.createObjectURL(file);
+    updateForm({ [field]: file, [`${field}_preview`]: localPreview } as Partial<FormData>);
+
+    try {
+      // Compress in background and convert to WebP
+      const isLogo = field === 'logo';
+      const maxDim = isLogo ? 800 : 1600;
+      const compressedFile = await compressAndConvertToWebP(file, maxDim, 0.85);
+
+      // Save the compressed file in state
+      updateForm({ [field]: compressedFile, [`${field}_preview`]: URL.createObjectURL(compressedFile) } as Partial<FormData>);
+
+      // Save Base64 representation to sessionStorage to persist across redirects (e.g. Google login)
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        try {
+          sessionStorage.setItem(`wizard_${field}_base64`, reader.result as string);
+        } catch (storageError) {
+          console.warn(`sessionStorage quota exceeded when storing ${field} base64:`, storageError);
+        }
+      };
+      reader.readAsDataURL(compressedFile);
+    } catch (err) {
+      console.error("Error compressing file:", err);
+      // Fallback: convert original file to Base64 (ignoring errors if it's too large)
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        try {
+          sessionStorage.setItem(`wizard_${field}_base64`, reader.result as string);
+        } catch (storageError) {
+          console.warn(`sessionStorage quota exceeded when storing original ${field} base64:`, storageError);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const uploadFile = async (file: File, path: string) => {
@@ -294,11 +369,41 @@ const CreateProfile = () => {
       let logo_url: string | null = null;
       let cover_image_url: string | null = null;
 
-      if (currentForm.logo) {
-        logo_url = await uploadFile(currentForm.logo, `${publishingUser.id}/${slug}/logo-${Date.now()}`);
+      let logoFile = currentForm.logo;
+      let coverFile = currentForm.cover;
+
+      // Restore files from sessionStorage if they are missing (e.g. after Google auth redirect)
+      if (!logoFile) {
+        const logoBase64 = sessionStorage.getItem('wizard_logo_base64');
+        if (logoBase64) {
+          try {
+            const res = await fetch(logoBase64);
+            const blob = await res.blob();
+            logoFile = new File([blob], 'logo.webp', { type: 'image/webp' });
+          } catch (e) {
+            console.error("Error reconstructing logo from session storage:", e);
+          }
+        }
       }
-      if (currentForm.cover) {
-        cover_image_url = await uploadFile(currentForm.cover, `${publishingUser.id}/${slug}/cover-${Date.now()}`);
+
+      if (!coverFile) {
+        const coverBase64 = sessionStorage.getItem('wizard_cover_base64');
+        if (coverBase64) {
+          try {
+            const res = await fetch(coverBase64);
+            const blob = await res.blob();
+            coverFile = new File([blob], 'cover.webp', { type: 'image/webp' });
+          } catch (e) {
+            console.error("Error reconstructing cover from session storage:", e);
+          }
+        }
+      }
+
+      if (logoFile) {
+        logo_url = await uploadFile(logoFile, `${publishingUser.id}/${slug}/logo-${Date.now()}`);
+      }
+      if (coverFile) {
+        cover_image_url = await uploadFile(coverFile, `${publishingUser.id}/${slug}/cover-${Date.now()}`);
       }
 
       const themeValue = currentForm.theme === 'custom'
@@ -347,6 +452,8 @@ const CreateProfile = () => {
       setShowAuthModal(false);
       sessionStorage.removeItem('wizard_form');
       sessionStorage.removeItem('wizard_step');
+      sessionStorage.removeItem('wizard_logo_base64');
+      sessionStorage.removeItem('wizard_cover_base64');
       toast.success('Profile published!');
     } catch (err) {
       const error = err as Error;
