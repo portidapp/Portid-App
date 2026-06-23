@@ -5,26 +5,44 @@ import { supabase } from '@/integrations/supabase/client';
 
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [isAdminState, setIsAdminState] = useState<{ checkedUserId: string | null; isAdmin: boolean }>({
+    checkedUserId: null,
+    isAdmin: false
+  });
+
+  const isChecking = loading || (user && isAdminState.checkedUserId !== user.id);
+
+  console.log("[AdminRoute] render. user:", user?.id, "loading:", loading, "isChecking:", isChecking, "isAdmin:", isAdminState.isAdmin);
 
   useEffect(() => {
     const checkAdmin = async () => {
-      if (!user) { setIsAdmin(false); return; }
+      if (!user) {
+        console.log("[AdminRoute] No user found, setting isAdmin = false");
+        setIsAdminState({ checkedUserId: null, isAdmin: false });
+        return;
+      }
       try {
+        console.log("[AdminRoute] Checking admin role for user:", user.id);
         const checkPromise = supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' });
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000));
         
-        const response = await Promise.race([checkPromise, timeoutPromise]) as { data: boolean | null };
-        setIsAdmin(!!response.data);
+        const response = await Promise.race([checkPromise, timeoutPromise]) as { data: boolean | null; error: any };
+        console.log("[AdminRoute] has_role response:", response);
+        if (response.error) {
+          console.error("[AdminRoute] has_role RPC returned error:", response.error);
+        }
+        setIsAdminState({ checkedUserId: user.id, isAdmin: !!response.data });
       } catch (err) {
-        console.error("Admin check failed:", err);
-        setIsAdmin(false);
+        console.error("[AdminRoute] Admin check failed with exception:", err);
+        setIsAdminState({ checkedUserId: user.id, isAdmin: false });
       }
     };
-    if (!loading) checkAdmin();
+    if (!loading) {
+      checkAdmin();
+    }
   }, [user, loading]);
 
-  if (loading || isAdmin === null) {
+  if (isChecking) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-accent border-t-transparent" />
@@ -33,7 +51,7 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!user) return <Navigate to="/admin-login" replace />;
-  if (!isAdmin) return <Navigate to="/dashboard" replace />;
+  if (!isAdminState.isAdmin) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 };
 

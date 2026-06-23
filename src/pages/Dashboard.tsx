@@ -22,7 +22,6 @@ import EditProfile from './EditProfile';
 import ProfileAnalytics from './ProfileAnalytics';
 import { PremiumLoader } from '@/components/PremiumLoader';
 import { toast } from 'sonner';
-import QRGeneratorModal from '@/components/QRGeneratorModal';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const SIDEBAR_NAV = [
@@ -41,7 +40,6 @@ const Dashboard = () => {
 
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
   const [profileData, setProfileData] = useState<{ id: string, slug: string, brand_name: string, theme: string } | null>(null);
-  const [isQrOpen, setIsQrOpen] = useState(false);
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -128,16 +126,21 @@ const Dashboard = () => {
             </button>
           ))}
 
-          {/* QR Generator Trigger */}
-          <button
-            onClick={() => setIsQrOpen(true)}
-            className="w-full flex items-center gap-4 px-5 py-2.5 rounded-full text-[13.5px] font-bold text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 transition-all text-left"
+          {/* QR Generator Link */}
+          <Link
+            to="/qr-code-generator"
+            className="w-full flex items-center justify-between px-5 py-2.5 rounded-full text-[13.5px] font-bold text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 transition-all"
           >
-            <div className="p-1.5 rounded-full bg-zinc-100/80 text-orange-500 group-hover:bg-zinc-200">
-              <QrCode className="h-4 w-4" />
+            <div className="flex items-center gap-4">
+              <div className="p-1.5 rounded-full bg-zinc-100/80 text-orange-500">
+                <QrCode className="h-4 w-4" />
+              </div>
+              <span>QR Generator</span>
             </div>
-            QR Generator
-          </button>
+            <span className="bg-orange-500 text-white text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full leading-none tracking-wide animate-pulse mr-2">
+              New
+            </span>
+          </Link>
         </div>
 
         <div className="p-6 space-y-2">
@@ -219,14 +222,18 @@ const Dashboard = () => {
               <Globe className="h-4.5 w-4.5" />
             </a>
 
-            {/* QR Generator Trigger */}
-            <button
-              onClick={() => setIsQrOpen(true)}
-              className="flex h-9 w-9 items-center justify-center bg-orange-50 text-orange-500 rounded-full border border-orange-100 hover:bg-orange-100 active:scale-95 transition-all shadow-sm"
+            {/* QR Generator Link */}
+            <Link
+              to="/qr-code-generator"
+              className="flex h-9 w-9 items-center justify-center bg-orange-50 text-orange-500 rounded-full border border-orange-100 hover:bg-orange-100 active:scale-95 transition-all shadow-sm relative"
               title="QR Generator"
             >
               <QrCode className="h-4.5 w-4.5" />
-            </button>
+              <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-orange-500"></span>
+              </span>
+            </Link>
 
             {/* User Avatar Action Menu Pill */}
             <button
@@ -354,16 +361,19 @@ const Dashboard = () => {
                   <ExternalLink className="h-4 w-4 opacity-75" />
                 </a>
 
-                <button
-                  onClick={() => {
-                    setIsProfileDrawerOpen(false);
-                    setIsQrOpen(true);
-                  }}
-                  className="w-full flex items-center gap-3 p-4 rounded-2xl border border-zinc-200 text-zinc-700 hover:bg-zinc-50 font-extrabold text-[13px] transition-all text-left"
+                <Link
+                  to="/qr-code-generator"
+                  onClick={() => setIsProfileDrawerOpen(false)}
+                  className="w-full flex items-center justify-between p-4 rounded-2xl border border-zinc-200 text-zinc-700 hover:bg-zinc-50 font-extrabold text-[13px] transition-all"
                 >
-                  <QrCode className="h-4.5 w-4.5 text-orange-500" />
-                  QR Generator
-                </button>
+                  <span className="flex items-center gap-3">
+                    <QrCode className="h-4.5 w-4.5 text-orange-500" />
+                    QR Generator
+                  </span>
+                  <span className="bg-orange-500 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full leading-none tracking-wide animate-pulse">
+                    New
+                  </span>
+                </Link>
 
                 <button
                   onClick={() => {
@@ -406,16 +416,6 @@ const Dashboard = () => {
         )}
       </AnimatePresence>
 
-      <QRGeneratorModal
-        isOpen={isQrOpen}
-        onClose={() => setIsQrOpen(false)}
-        profiles={profileData ? [{
-          id: profileData.id,
-          slug: profileData.slug,
-          brand_name: profileData.brand_name || 'My Profile',
-          theme: profileData.theme || 'minimal'
-        }] : []}
-      />
     </div>
   );
 };

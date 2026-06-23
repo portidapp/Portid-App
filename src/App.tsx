@@ -27,6 +27,8 @@ const DesignStudio = lazy(() => import("./pages/DesignStudio"));
 const DemoProfile = lazy(() => import("./pages/DemoProfile"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const QRCodeGenerator = lazy(() => import("./pages/QRCodeGenerator"));
+import QRRedirect from "./pages/QRRedirect";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +51,8 @@ const App = () => (
                 <Route path="/create-profile" element={<CreateProfile />} />
                 <Route path="/pricing" element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
                 <Route path="/p/:slug" element={<PublicProfile />} />
+                <Route path="/q/:code" element={<QRRedirect />} />
+                <Route path="/qr-code-generator" element={<QRCodeGenerator />} />
                 <Route path="/admin-login" element={<AdminLogin />} />
                 <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
                 <Route path="/profile-analytics/:id" element={<ProtectedRoute><ProfileAnalytics /></ProtectedRoute>} />

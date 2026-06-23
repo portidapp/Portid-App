@@ -96,6 +96,12 @@ const Landing = () => {
             <a href="#features" className="hover:text-orange-500 transition-colors">Features</a>
             <a href="#products" className="hover:text-orange-500 transition-colors">Products</a>
             <a href="#pricing" className="hover:text-orange-500 transition-colors">Pricing</a>
+            <Link to="/qr-code-generator" className="hover:text-orange-500 transition-colors flex items-center gap-1.5">
+              QR Generator
+              <span className="bg-orange-500 text-white text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full leading-none tracking-wide animate-pulse">
+                New
+              </span>
+            </Link>
             <a href="#about" className="hover:text-orange-500 transition-colors">About</a>
           </div>
 
@@ -128,6 +134,12 @@ const Landing = () => {
                 <a href="#features" onClick={() => setIsMobileMenuOpen(false)} className="text-zinc-600 hover:text-zinc-900 px-2 text-lg transition-colors">Features</a>
                 <a href="#products" onClick={() => setIsMobileMenuOpen(false)} className="text-zinc-600 hover:text-zinc-900 px-2 text-lg transition-colors">Products</a>
                 <a href="#pricing" onClick={() => setIsMobileMenuOpen(false)} className="text-zinc-600 hover:text-zinc-900 px-2 text-lg transition-colors">Pricing</a>
+                <Link to="/qr-code-generator" onClick={() => setIsMobileMenuOpen(false)} className="text-zinc-600 hover:text-zinc-900 px-2 text-lg transition-colors flex items-center gap-2">
+                  QR Generator
+                  <span className="bg-orange-500 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full leading-none tracking-wide">
+                    New
+                  </span>
+                </Link>
                 <a href="#about" onClick={() => setIsMobileMenuOpen(false)} className="text-zinc-600 hover:text-zinc-900 px-2 text-lg transition-colors">About</a>
               </div>
               <hr className="border-zinc-100" />
