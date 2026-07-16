@@ -388,50 +388,94 @@ const Dashboard = () => {
           {activeTab === 'overview' ? (
             <div className="space-y-6 sm:space-y-8 pt-4">
               {/* QR Code list/management section */}
+              {/* QR Code list/management section (Sleek Bar Layout) */}
               {qrs.length > 0 && (
-                <Card className="bg-white border border-zinc-200/80 rounded-3xl p-6 shadow-sm text-left">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="text-base font-black text-zinc-900 tracking-tight flex items-center gap-2">
-                        <QrCode className="h-5 w-5 text-orange-500" />
-                        Your Connected QR Codes
-                      </h3>
-                      <p className="text-[11px] text-zinc-500 font-bold mt-0.5 uppercase tracking-wide">
-                        Manage dynamic redirects, download graphics, and view real-time scan statistics.
-                      </p>
-                    </div>
-                  </div>
+                <div className="space-y-3 mb-6">
+                  {qrs.map((qr) => {
+                    const isEditing = editingQrId === qr.id;
+                    const isDynamicCode = qr.code.startsWith('DYN_');
+                    
+                    return (
+                      <div key={qr.id} className="bg-[#131313] rounded-xl flex items-center justify-between p-3.5 pr-4 border border-zinc-800/80 shadow-sm relative overflow-hidden">
+                        {/* Left section: Identity */}
+                        <div className="flex items-center gap-4">
+                          <h4 className="text-sm font-bold text-white min-w-[130px] truncate">
+                            {qr.name || `My Dynamic QR`}
+                          </h4>
+                          <span className="text-[11px] font-bold text-orange-500 min-w-[90px]">
+                            {qr.code}
+                          </span>
+                          <span className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            {qr.is_paused ? 'Paused' : 'Assigned'}
+                          </span>
+                        </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mt-4">
-                    {qrs.map((qr) => {
-                      const isEditing = editingQrId === qr.id;
-                      const isDynamicCode = qr.code.startsWith('DYN_');
-                      
-                      return (
-                        <div key={qr.id} className="bg-zinc-50 border border-zinc-200/60 rounded-2xl p-5 space-y-4 relative overflow-hidden">
-                          {qr.is_paused && (
-                            <div className="absolute top-0 right-0 left-0 bg-amber-500/10 text-amber-600 text-[10px] font-black uppercase tracking-widest py-1 px-4 text-center border-b border-amber-500/20">
-                              Paused
+                        {/* Middle section: Destination & Style */}
+                        <div className="flex items-center gap-8 hidden lg:flex">
+                          {!isEditing ? (
+                            <a href={qr.assigned_profile_id ? `/${qr.profiles?.slug}` : (qr.custom_url || '#')} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-zinc-300 hover:text-white transition-colors text-xs font-medium cursor-pointer max-w-[200px] truncate">
+                              {qr.assigned_profile_id ? `/${qr.profiles?.slug}` : (qr.custom_url || 'https://portid.in')}
+                              <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                            </a>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                                <select
+                                  value={editDestType}
+                                  onChange={(e) => setEditDestType(e.target.value as any)}
+                                  className="h-7 px-2 rounded-lg border border-zinc-700 bg-zinc-800 text-white text-[10px] font-bold focus:border-orange-500 focus:outline-none appearance-none"
+                                >
+                                  <option value="profile">Profile</option>
+                                  <option value="custom">Custom</option>
+                                </select>
+                                {editDestType === 'custom' && (
+                                  <Input
+                                    placeholder="https://example.com"
+                                    value={editDestValue}
+                                    onChange={(e) => setEditDestValue(e.target.value)}
+                                    className="h-7 rounded-lg border-zinc-700 bg-zinc-800 text-white text-[10px] w-[140px]"
+                                  />
+                                )}
+                                <Button
+                                  type="button"
+                                  onClick={() => handleSaveDestination(qr.id)}
+                                  disabled={editLoading}
+                                  className="h-7 px-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-bold text-[9px] uppercase tracking-wider"
+                                >
+                                  {editLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  onClick={() => setEditingQrId(null)}
+                                  className="h-7 px-2 rounded-lg text-zinc-400 hover:text-white"
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
                             </div>
                           )}
 
-                          <div className="flex items-start justify-between gap-4 pt-1">
-                            <div className="space-y-1">
-                              <span className="bg-white text-zinc-650 border border-zinc-200 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider inline-block">
-                                {isDynamicCode ? 'Dynamic QR' : 'Physical QR Stand'}
-                              </span>
-                              <h4 className="text-sm font-black text-zinc-800 tracking-tight truncate max-w-[170px] mt-1">
-                                {qr.name || `QR Code (${qr.code})`}
-                              </h4>
-                              <p className="text-[10px] font-mono font-bold text-zinc-400">ID: {qr.code}</p>
-                            </div>
+                          <div className="flex items-center gap-2 text-zinc-400 text-xs font-medium">
+                            <div className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: qr.style?.color || '#f97316' }}></div>
+                            <span className="capitalize">{qr.style?.dotsType || 'Rounded'} / {qr.style?.cornersSquareType || 'Extra-Rounded'}</span>
+                          </div>
+                        </div>
 
-                            {/* Mini preview */}
-                            <div 
-                              style={{ backgroundColor: qr.is_paused ? '#e4e4e7' : (qr.style?.transparent ? 'transparent' : (qr.style?.bgColor || '#ffffff')) }}
-                              className="h-12 w-12 rounded-xl border border-zinc-200 flex items-center justify-center p-1 cursor-pointer hover:scale-105 transition-transform"
-                              onClick={() => {
-                                // download QR
+                        {/* Right section: Actions */}
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => startEditingDestination(qr)}
+                            className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg transition-colors border border-zinc-700 uppercase tracking-wider"
+                          >
+                            Link
+                          </button>
+                          <button 
+                            onClick={() => navigate('/qr-code-generator')}
+                            className="bg-zinc-800 hover:bg-zinc-700 text-orange-500 font-bold text-[10px] px-3 py-1.5 rounded-lg transition-colors border border-zinc-700 uppercase tracking-wider"
+                          >
+                            Style
+                          </button>
+                          <button 
+                            onClick={() => {
                                 const color = qr.style?.color || '#f97316';
                                 const bgColor = qr.style?.transparent ? 'transparent' : (qr.style?.bgColor || '#ffffff');
                                 const inst = new QRCodeStyling({
@@ -445,166 +489,26 @@ const Dashboard = () => {
                                 });
                                 inst.download({ name: `qr-${qr.code}`, extension: 'png' });
                                 toast.success("Download started!");
-                              }}
-                              title="Download High-Res QR code"
+                            }}
+                            className="p-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-400 hover:text-white transition-colors border border-zinc-700 flex items-center justify-center"
+                            title="Download QR"
+                          >
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                          </button>
+                          {isDynamicCode && (
+                            <button 
+                              onClick={() => handleDeleteQR(qr.id, qr.code)}
+                              className="p-1.5 bg-zinc-800/80 hover:bg-rose-900/50 rounded-lg text-rose-500 transition-colors border border-rose-900/30 flex items-center justify-center"
+                              title="Delete QR"
                             >
-                              <QrCode 
-                                style={{ color: qr.is_paused ? '#a1a1aa' : (qr.style?.color || '#f97316') }} 
-                                className="h-8 w-8 opacity-90" 
-                              />
-                            </div>
-                          </div>
-
-                          {/* Stats Panel */}
-                          <div className="grid grid-cols-2 gap-4 bg-white p-3 rounded-xl border border-zinc-200/50">
-                            <div>
-                              <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block leading-none">Scans</span>
-                              <span className="text-sm font-black text-zinc-800 mt-1 block">{qr.scan_count || 0}</span>
-                            </div>
-                            <div>
-                              <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block leading-none">Last Scanned</span>
-                              <span className="text-[10px] font-bold text-zinc-650 mt-1 block truncate">
-                                {qr.last_scanned_at ? new Date(qr.last_scanned_at).toLocaleDateString() : 'Never'}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Destination details panel */}
-                          {!isEditing ? (
-                            <div className="space-y-1 bg-white p-3 rounded-xl border border-zinc-150 text-xs">
-                              <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block">Destination</span>
-                              <div className="flex items-center justify-between gap-2 mt-0.5">
-                                <span className="text-[9px] font-black text-orange-500 uppercase tracking-wide">
-                                  {qr.destination_type || (qr.assigned_profile_id ? 'profile' : 'custom')}
-                                </span>
-                                <span className="text-[11px] text-zinc-550 font-bold truncate max-w-[150px]">
-                                  {qr.assigned_profile_id ? `Profile (/${qr.profiles?.slug})` : qr.custom_url}
-                                </span>
-                              </div>
-                            </div>
-                          ) : (
-                            /* EDIT DESTINATION STATE CONTAINER */
-                            <div className="space-y-2 bg-white p-3.5 rounded-xl border border-orange-500/20 animate-in slide-in-from-top-1 duration-200">
-                              <span className="text-[9px] font-black text-zinc-555 uppercase tracking-widest block">Edit Destination</span>
-                              
-                              <div className="space-y-2">
-                                <select
-                                  value={editDestType}
-                                  onChange={(e) => setEditDestType(e.target.value as any)}
-                                  className="w-full h-8 px-2 rounded-lg border border-zinc-200 bg-white text-zinc-800 text-[10.5px] font-bold focus:border-orange-500 focus:outline-none appearance-none cursor-pointer"
-                                >
-                                  <option value="profile">Portid Profile</option>
-                                  <option value="custom">Custom URL</option>
-                                </select>
-
-                                {editDestType === 'custom' && (
-                                  <Input
-                                    placeholder="https://example.com"
-                                    value={editDestValue}
-                                    onChange={(e) => setEditDestValue(e.target.value)}
-                                    className="h-8 rounded-lg border-zinc-200 focus:border-orange-500 bg-white text-[10.5px] font-semibold"
-                                  />
-                                )}
-                              </div>
-
-                              <div className="flex gap-2 pt-1">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={() => setEditingQrId(null)}
-                                  className="flex-1 h-7 rounded-lg border-zinc-200 bg-white text-zinc-700 font-bold text-[9.5px] uppercase tracking-wider"
-                                >
-                                  Cancel
-                                </Button>
-                                <Button
-                                  type="button"
-                                  onClick={() => handleSaveDestination(qr.id)}
-                                  disabled={editLoading}
-                                  className="flex-1 h-7 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-bold text-[9.5px] uppercase tracking-wider"
-                                >
-                                  {editLoading ? <Loader2 className="h-3 w-3 animate-spin mx-auto" /> : 'Save'}
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Controller Action buttons panel */}
-                          {!isEditing && (
-                            <div className="space-y-3 pt-2 border-t border-zinc-200/60 flex flex-col">
-                              <div className="flex justify-between items-center gap-3">
-                                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block leading-none">Status</span>
-                                <div className="flex items-center gap-1.5">
-                                  <input
-                                    type="checkbox"
-                                    checked={!qr.is_paused}
-                                    onChange={() => handleTogglePause(qr.id, qr.is_paused)}
-                                    className="h-3.5 w-3.5 rounded border-zinc-300 text-orange-500 accent-orange-500 cursor-pointer"
-                                  />
-                                  <span className={`text-[10px] font-extrabold uppercase tracking-wide ${!qr.is_paused ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                    {!qr.is_paused ? 'Active' : 'Paused'}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-3 gap-2 pt-1">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={() => startEditingDestination(qr)}
-                                  className="h-8 rounded-xl border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 font-bold text-[10px] uppercase tracking-wider"
-                                >
-                                  Edit Dest
-                                </Button>
-                                
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={() => navigate('/qr-code-generator')}
-                                  className="h-8 rounded-xl border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 font-bold text-[10px] uppercase tracking-wider"
-                                >
-                                  Style
-                                </Button>
-
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={() => {
-                                    const color = qr.style?.color || '#f97316';
-                                    const bgColor = qr.style?.transparent ? 'transparent' : (qr.style?.bgColor || '#ffffff');
-                                    const inst = new QRCodeStyling({
-                                      width: 1024,
-                                      height: 1024,
-                                      data: qr.code.startsWith('DYN_') ? `${window.location.origin}/q/${qr.code}` : qr.code,
-                                      dotsOptions: { color, type: (qr.style?.dotsType || 'rounded') as any },
-                                      cornersSquareOptions: { color, type: (qr.style?.cornersSquareType || 'extra-rounded') as any },
-                                      cornersDotOptions: { color, type: (qr.style?.cornersDotType || 'dot') as any },
-                                      backgroundOptions: { color: bgColor }
-                                    });
-                                    inst.download({ name: `qr-${qr.code}`, extension: 'png' });
-                                    toast.success("Download started!");
-                                  }}
-                                  className="h-8 rounded-xl border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-55 font-bold text-[10px] uppercase tracking-wider"
-                                >
-                                  Download
-                                </Button>
-                              </div>
-
-                              {isDynamicCode && (
-                                <Button
-                                  type="button"
-                                  onClick={() => handleDeleteQR(qr.id, qr.code)}
-                                  className="w-full h-8 rounded-xl border border-rose-100 bg-rose-50 hover:bg-rose-100 text-rose-500 hover:text-rose-600 font-bold text-[10px] uppercase tracking-wider transition-all"
-                                >
-                                  Delete QR
-                                </Button>
-                              )}
-                            </div>
+                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                            </button>
                           )}
                         </div>
-                      );
-                    })}
-                  </div>
-                </Card>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
 
               <ProfileAnalytics embedded={true} profileId={profileData.id} />
