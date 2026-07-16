@@ -73,8 +73,36 @@ const QRRedirect: React.FC = () => {
             return;
           }
 
+          // Extract basic browser/device info
+          const ua = navigator.userAgent;
+          let browserName = "Unknown";
+          if (ua.indexOf("Firefox") > -1) browserName = "Firefox";
+          else if (ua.indexOf("SamsungBrowser") > -1) browserName = "Samsung Internet";
+          else if (ua.indexOf("Opera") > -1 || ua.indexOf("OPR") > -1) browserName = "Opera";
+          else if (ua.indexOf("Trident") > -1) browserName = "Internet Explorer";
+          else if (ua.indexOf("Edge") > -1 || ua.indexOf("Edg") > -1) browserName = "Edge";
+          else if (ua.indexOf("Chrome") > -1) browserName = "Chrome";
+          else if (ua.indexOf("Safari") > -1) browserName = "Safari";
+
+          let osName = "Unknown";
+          if (ua.indexOf("Win") > -1) osName = "Windows";
+          else if (ua.indexOf("Mac") > -1) osName = "Mac OS";
+          else if (ua.indexOf("X11") > -1) osName = "UNIX";
+          else if (ua.indexOf("Linux") > -1) osName = "Linux";
+          if (ua.indexOf("Android") > -1) osName = "Android";
+          if (ua.indexOf("like Mac") > -1) osName = "iOS";
+
+          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+          const deviceType = isMobile ? "Mobile" : "Desktop";
+
           // Track scan count asynchronously
-          supabase.rpc('track_qr_scan', { qr_id: retrievedQr.id }).then(
+          supabase.rpc('track_qr_scan', { 
+            qr_id: retrievedQr.id,
+            p_user_agent: ua,
+            p_browser: browserName,
+            p_os: osName,
+            p_device_type: deviceType
+          }).then(
             () => {},
             (err) => console.error('Error tracking QR scan:', err)
           );

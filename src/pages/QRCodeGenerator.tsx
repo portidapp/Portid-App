@@ -303,19 +303,19 @@ const QRCodeGenerator: React.FC = () => {
       const { error } = await supabase.from('qr_codes').insert({
         user_id: user.id,
         code,
-        destination_type: 'custom',
         custom_url: qrValue,
-        status: 'active',
-        is_paused: false,
+        status: 'assigned',
         style: styleObj,
-        name: 'My Dynamic QR',
-        scan_count: 0
+        name: 'My Dynamic QR'
       });
 
       if (error) throw error;
       
       toast.success('Dynamic QR generated successfully!');
-      setUserDynamicQrs([{ code, destination_type: 'custom', custom_url: qrValue, style: styleObj }]);
+      setUserDynamicQrs([{ code, custom_url: qrValue, style: styleObj }]);
+      setSavedDynamicCode(code);
+      setIsDynamicSaved(true);
+      setIsDynamic(true);
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || 'Failed to generate dynamic QR');
@@ -589,93 +589,7 @@ const QRCodeGenerator: React.FC = () => {
     toast.success("QR Code content copied to clipboard!");
   };
 
-  const handleSaveDynamicQR = async () => {
-    if (!user) {
-      setShowUpgradeModal(true);
-      return;
-    }
-
-    setSavingLoading(true);
-
-    // Limit check for free tier: 1 dynamic QR max
-    const isFree = planTier !== 'premium';
-    if (isFree) {
-      try {
-        const { count, error } = await supabase
-          .from('qr_codes')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .like('code', 'DYN_%');
-
-        if (error) throw error;
-
-        if (count && count >= 1) {
-          toast.error("Free plan limit reached: You can only create 1 dynamic QR code. Upgrade to Premium for unlimited codes.");
-          setShowUpgradeModal(true);
-          setSavingLoading(false);
-          return;
-        }
-      } catch (err) {
-        console.error("Error verifying dynamic QR count limit:", err);
-      }
-    }
-
-    const newCode = `DYN_${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    const dynamicStyle = {
-      color: qrColor,
-      dotsType: qrDotsType,
-      cornersSquareType: qrCornersSquareType,
-      cornersDotType: qrCornersDotType,
-      fileFormat: 'png',
-      transparent: qrTransparent
-    };
-
-    try {
-      const payload: any = {
-        code: newCode,
-        name: `Dynamic QR (${activeTab})`,
-        user_id: user.id,
-        status: 'assigned',
-        style: dynamicStyle
-      };
-
-      if (dynamicRedirectType === 'profile' && selectedProfileId) {
-        payload.assigned_profile_id = selectedProfileId;
-        payload.destination_type = 'profile';
-      } else {
-        payload.custom_url = qrValue;
-        payload.destination_type = 'custom';
-      }
-
-      const { error } = await supabase
-        .from('qr_codes')
-        .insert(payload);
-
-      if (error) throw error;
-
-      toast.success(`Successfully saved Dynamic QR code ${newCode} to your account!`);
-      setSavedDynamicCode(newCode);
-      setIsDynamicSaved(true);
-      fetchDynamicCodesCount();
-    } catch (err: any) {
-      console.error("Save dynamic error:", err);
-      toast.error(err.message || "Failed to save dynamic QR code.");
-    } finally {
-      setSavingLoading(false);
-    }
-  };
-
-  const handleResetDynamic = () => {
-    setSavedDynamicCode('');
-    setIsDynamicSaved(false);
-  };
-
-  const handleDynamicToggle = (checked: boolean) => {
-    setIsDynamic(checked);
-    if (!checked) {
-      handleResetDynamic();
-    }
-  };
+  // Removed unused handleSaveDynamicQR and handleResetDynamic
 
   // Connect Printed QR feature methods
   const startScanner = async () => {

@@ -321,6 +321,53 @@ export type Database = {
           }
         ]
       }
+      qr_scans: {
+        Row: {
+          browser: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          device_type: string | null
+          id: string
+          ip_address: string | null
+          os: string | null
+          qr_code_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          browser?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          device_type?: string | null
+          id?: string
+          ip_address?: string | null
+          os?: string | null
+          qr_code_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          browser?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          device_type?: string | null
+          id?: string
+          ip_address?: string | null
+          os?: string | null
+          qr_code_id?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qr_scans_qr_code_id_fkey"
+            columns: ["qr_code_id"]
+            isOneToOne: false
+            referencedRelation: "qr_codes"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       support_enquiries: {
         Row: {
           created_at: string
@@ -417,6 +464,13 @@ export type Database = {
       track_qr_scan: {
         Args: {
           qr_id: string
+          p_ip_address?: string
+          p_user_agent?: string
+          p_country?: string
+          p_city?: string
+          p_device_type?: string
+          p_os?: string
+          p_browser?: string
         }
         Returns: unknown
       }
