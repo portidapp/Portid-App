@@ -546,16 +546,25 @@ const Dashboard = () => {
                                 </div>
                               </div>
 
-                              <div className="grid grid-cols-2 gap-2 pt-1">
+                              <div className="grid grid-cols-3 gap-2 pt-1">
                                 <Button
                                   type="button"
                                   variant="outline"
                                   onClick={() => startEditingDestination(qr)}
-                                  className="h-8 rounded-xl border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-55 font-bold text-[10px] uppercase tracking-wider"
+                                  className="h-8 rounded-xl border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 font-bold text-[10px] uppercase tracking-wider"
                                 >
                                   Edit Dest
                                 </Button>
                                 
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => navigate('/qr-code-generator')}
+                                  className="h-8 rounded-xl border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 font-bold text-[10px] uppercase tracking-wider"
+                                >
+                                  Style
+                                </Button>
+
                                 <Button
                                   type="button"
                                   variant="outline"

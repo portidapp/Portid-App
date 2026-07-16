@@ -264,6 +264,65 @@ const QRCodeGenerator: React.FC = () => {
   const [savingLoading, setSavingLoading] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [isDynamic, setIsDynamic] = useState(false);
+  const [userDynamicQrs, setUserDynamicQrs] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (user) {
+      supabase.from('qr_codes').select('*').eq('user_id', user.id).then(({ data }) => {
+        if (data) {
+          const dQrs = data.filter((q: any) => q.code.startsWith('DYN_'));
+          setUserDynamicQrs(dQrs);
+        }
+      });
+    }
+  }, [user]);
+
+  const handleGenerateDynamicQR = async () => {
+    if (!user) {
+      setShowUpgradeModal(true);
+      return;
+    }
+    if (userDynamicQrs.length >= 1) {
+      toast.error('You already have a dynamic QR code. Check your dashboard!');
+      return;
+    }
+
+    setSavingLoading(true);
+    const code = 'DYN_' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    
+    const styleObj = {
+      color: qrColor,
+      bgColor: qrBgColor,
+      transparent: qrTransparent,
+      dotsType: qrDotsType,
+      cornersSquareType: qrCornersSquareType,
+      cornersDotType: qrCornersDotType,
+    };
+
+    try {
+      const { error } = await supabase.from('qr_codes').insert({
+        user_id: user.id,
+        code,
+        destination_type: 'custom',
+        custom_url: qrValue,
+        status: 'active',
+        is_paused: false,
+        style: styleObj,
+        name: 'My Dynamic QR',
+        scan_count: 0
+      });
+
+      if (error) throw error;
+      
+      toast.success('Dynamic QR generated successfully!');
+      setUserDynamicQrs([{ code, destination_type: 'custom', custom_url: qrValue, style: styleObj }]);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Failed to generate dynamic QR');
+    } finally {
+      setSavingLoading(false);
+    }
+  };
 
   // Compute final QR String payload
   const [qrValue, setQrValue] = useState('https://portid.in');
@@ -1648,37 +1707,60 @@ const QRCodeGenerator: React.FC = () => {
               </Button>
             </div>
 
+          </Card>
+
+          {/* Make it Dynamic Instant CTA */}
+          <Card className="bg-gradient-to-br from-orange-500 to-rose-500 border-0 rounded-[2.5rem] shadow-xl shadow-orange-500/20 p-1 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+              <Sparkles className="w-24 h-24 text-white" />
+            </div>
+            
+            <div className="bg-white/95 backdrop-blur-md rounded-[2.3rem] p-6 text-center relative z-10 space-y-4">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-tr from-orange-400 to-rose-400 text-white shadow-lg shadow-orange-500/20">
+                <Sparkles className="h-7 w-7" />
+              </div>
+              
+              <div>
+                <h3 className="text-lg font-black text-zinc-900 tracking-tight">Make it Dynamic</h3>
+                <p className="text-xs text-zinc-500 font-semibold mt-1 px-2">
+                  Edit destination anytime without re-printing, track scans, and more.
+                </p>
+              </div>
+
+              {userDynamicQrs.length > 0 ? (
+                <div className="space-y-3">
+                  <p className="text-xs font-bold text-emerald-600 bg-emerald-50 py-2 px-3 rounded-xl border border-emerald-100">
+                    You have an active Dynamic QR!
+                  </p>
+                  <Button
+                    onClick={() => navigate('/dashboard')}
+                    className="w-full h-12 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs uppercase tracking-wider shadow-lg"
+                  >
+                    Manage in Dashboard
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  onClick={handleGenerateDynamicQR}
+                  disabled={savingLoading}
+                  className="w-full h-12 rounded-xl bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-orange-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  {savingLoading ? (
+                    <Loader2 className="h-5 w-5 animate-spin mx-auto" />
+                  ) : (
+                    "Generate Dynamic QR"
+                  )}
+                </Button>
+              )}
+            </div>
+          </Card>
+
             {isDownloadDisabled && (
               <p className="text-[10px] text-amber-600 font-semibold text-center mt-2 animate-pulse bg-amber-500/5 py-1.5 px-3 rounded-lg border border-amber-500/10">
                 ⚠️ Click "Generate Dynamic QR" first to copy or download.
               </p>
             )}
 
-            {isDynamic && isDynamicSaved && (
-              <div className="w-full border-t border-zinc-150 pt-4 text-left space-y-2 animate-in fade-in duration-300">
-                <div className="bg-emerald-50 border border-emerald-200/60 p-4 rounded-2xl">
-                  <div className="flex items-center gap-1.5 text-emerald-600 mb-1.5">
-                    <Sparkles className="h-4 w-4" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Dynamic QR Active</span>
-                  </div>
-                  <p className="text-[11px] text-zinc-650 leading-relaxed font-semibold">
-                    Code: <code className="bg-white/80 border border-zinc-150 text-zinc-800 px-1 py-0.5 rounded font-mono font-bold">{savedDynamicCode}</code>
-                  </p>
-                  <p className="text-[10px] text-zinc-550 mt-1 leading-relaxed">
-                    Redirecting to: <span className="font-bold text-zinc-700 truncate block max-w-full">{dynamicRedirectType === 'profile' && selectedProfileId ? `Profile ID: ${selectedProfileId}` : qrValue}</span>
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleResetDynamic}
-                  className="w-full h-9 rounded-xl border-zinc-200 text-zinc-500 hover:text-zinc-700 text-[10px] font-bold uppercase tracking-wider"
-                >
-                  Create Another / Design New
-                </Button>
-              </div>
-            )}
-          </Card>
         </aside>
       </main>
       ) : (
