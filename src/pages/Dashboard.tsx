@@ -16,13 +16,18 @@ import {
   ExternalLink,
   QrCode,
   X,
-  HelpCircle
+  HelpCircle,
+  Loader2
 } from 'lucide-react';
 import EditProfile from './EditProfile';
 import ProfileAnalytics from './ProfileAnalytics';
 import { PremiumLoader } from '@/components/PremiumLoader';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card } from '@/components/ui/card';
+import QRCodeStyling from 'qr-code-styling';
 
 const SIDEBAR_NAV = [
   { id: 'overview', label: 'Dashboard', icon: BarChart3 },
@@ -88,6 +93,135 @@ const Dashboard = () => {
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
+  };
+
+  // QR Tag management states
+  const [qrs, setQrs] = useState<any[]>([]);
+  const [qrsLoading, setQrsLoading] = useState(true);
+  const [editingQrId, setEditingQrId] = useState<string | null>(null);
+  const [editDestType, setEditDestType] = useState<'profile' | 'custom'>('profile');
+  const [editDestValue, setEditDestValue] = useState('');
+  const [editLoading, setEditLoading] = useState(false);
+
+  const fetchQRs = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('qr_codes')
+        .select('*, profiles(brand_name, slug)')
+        .eq('user_id', user.id);
+      if (error) throw error;
+      setQrs(data || []);
+    } catch (err) {
+      console.error("Error fetching QR codes:", err);
+    } finally {
+      setQrsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user && activeTab === 'overview') {
+      fetchQRs();
+    }
+  }, [user, activeTab]);
+
+  const handleTogglePause = async (qrId: string, currentPaused: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('qr_codes')
+        .update({ is_paused: !currentPaused })
+        .eq('id', qrId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast.success(`QR code ${!currentPaused ? 'paused' : 'resumed'} successfully.`);
+      fetchQRs();
+    } catch (err: any) {
+      console.error("Error toggling pause state:", err);
+      toast.error(err.message || "Failed to toggle status.");
+    }
+  };
+
+  const handleDeleteQR = async (qrId: string, code: string) => {
+    const confirmDelete = window.confirm(`Are you sure you want to delete dynamic QR code "${code}"? This will permanently disable it.`);
+    if (!confirmDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from('qr_codes')
+        .delete()
+        .eq('id', qrId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast.success("QR code deleted successfully.");
+      fetchQRs();
+    } catch (err: any) {
+      console.error("Error deleting QR code:", err);
+      toast.error(err.message || "Failed to delete QR code.");
+    }
+  };
+
+  const startEditingDestination = (qr: any) => {
+    setEditingQrId(qr.id);
+    setEditDestType(qr.assigned_profile_id ? 'profile' : 'custom');
+    setEditDestValue(qr.custom_url || '');
+  };
+
+  const handleSaveDestination = async (qrId: string) => {
+    setEditLoading(true);
+    try {
+      const isProfile = editDestType === 'profile';
+      const profileId = isProfile ? profileData?.id : null;
+      let targetUrl = isProfile ? null : editDestValue.trim();
+
+      if (!isProfile) {
+        if (!targetUrl) {
+          toast.error("Please enter a custom URL.");
+          setEditLoading(false);
+          return;
+        }
+        if (!/^https?:\/\//i.test(targetUrl)) {
+          targetUrl = 'https://' + targetUrl;
+        }
+        try {
+          new URL(targetUrl);
+        } catch (_) {
+          toast.error("Please enter a valid web URL.");
+          setEditLoading(false);
+          return;
+        }
+      } else {
+        if (!profileId) {
+          toast.error("Profile not found.");
+          setEditLoading(false);
+          return;
+        }
+      }
+
+      const { error } = await supabase
+        .from('qr_codes')
+        .update({
+          assigned_profile_id: profileId,
+          custom_url: targetUrl,
+          destination_type: isProfile ? 'profile' : 'custom'
+        })
+        .eq('id', qrId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast.success("Destination updated successfully.");
+      setEditingQrId(null);
+      fetchQRs();
+    } catch (err: any) {
+      console.error("Error updating destination:", err);
+      toast.error(err.message || "Failed to update destination.");
+    } finally {
+      setEditLoading(false);
+    }
   };
 
   if (loading || authLoading) {
@@ -252,7 +386,220 @@ const Dashboard = () => {
         <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-32 md:pb-8">
 
           {activeTab === 'overview' ? (
-            <ProfileAnalytics embedded={true} profileId={profileData.id} />
+            <div className="space-y-6 sm:space-y-8 pt-4">
+              {/* QR Code list/management section */}
+              {qrs.length > 0 && (
+                <Card className="bg-white border border-zinc-200/80 rounded-3xl p-6 shadow-sm text-left">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-base font-black text-zinc-900 tracking-tight flex items-center gap-2">
+                        <QrCode className="h-5 w-5 text-orange-500" />
+                        Your Connected QR Codes
+                      </h3>
+                      <p className="text-[11px] text-zinc-500 font-bold mt-0.5 uppercase tracking-wide">
+                        Manage dynamic redirects, download graphics, and view real-time scan statistics.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mt-4">
+                    {qrs.map((qr) => {
+                      const isEditing = editingQrId === qr.id;
+                      const isDynamicCode = qr.code.startsWith('DYN_');
+                      
+                      return (
+                        <div key={qr.id} className="bg-zinc-50 border border-zinc-200/60 rounded-2xl p-5 space-y-4 relative overflow-hidden">
+                          {qr.is_paused && (
+                            <div className="absolute top-0 right-0 left-0 bg-amber-500/10 text-amber-600 text-[10px] font-black uppercase tracking-widest py-1 px-4 text-center border-b border-amber-500/20">
+                              Paused
+                            </div>
+                          )}
+
+                          <div className="flex items-start justify-between gap-4 pt-1">
+                            <div className="space-y-1">
+                              <span className="bg-white text-zinc-650 border border-zinc-200 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider inline-block">
+                                {isDynamicCode ? 'Dynamic QR' : 'Physical QR Stand'}
+                              </span>
+                              <h4 className="text-sm font-black text-zinc-800 tracking-tight truncate max-w-[170px] mt-1">
+                                {qr.name || `QR Code (${qr.code})`}
+                              </h4>
+                              <p className="text-[10px] font-mono font-bold text-zinc-400">ID: {qr.code}</p>
+                            </div>
+
+                            {/* Mini preview */}
+                            <div 
+                              style={{ backgroundColor: qr.is_paused ? '#e4e4e7' : (qr.style?.transparent ? 'transparent' : (qr.style?.bgColor || '#ffffff')) }}
+                              className="h-12 w-12 rounded-xl border border-zinc-200 flex items-center justify-center p-1 cursor-pointer hover:scale-105 transition-transform"
+                              onClick={() => {
+                                // download QR
+                                const color = qr.style?.color || '#f97316';
+                                const bgColor = qr.style?.transparent ? 'transparent' : (qr.style?.bgColor || '#ffffff');
+                                const inst = new QRCodeStyling({
+                                  width: 1024,
+                                  height: 1024,
+                                  data: qr.code.startsWith('DYN_') ? `${window.location.origin}/q/${qr.code}` : qr.code,
+                                  dotsOptions: { color, type: (qr.style?.dotsType || 'rounded') as any },
+                                  cornersSquareOptions: { color, type: (qr.style?.cornersSquareType || 'extra-rounded') as any },
+                                  cornersDotOptions: { color, type: (qr.style?.cornersDotType || 'dot') as any },
+                                  backgroundOptions: { color: bgColor }
+                                });
+                                inst.download({ name: `qr-${qr.code}`, extension: 'png' });
+                                toast.success("Download started!");
+                              }}
+                              title="Download High-Res QR code"
+                            >
+                              <QrCode 
+                                style={{ color: qr.is_paused ? '#a1a1aa' : (qr.style?.color || '#f97316') }} 
+                                className="h-8 w-8 opacity-90" 
+                              />
+                            </div>
+                          </div>
+
+                          {/* Stats Panel */}
+                          <div className="grid grid-cols-2 gap-4 bg-white p-3 rounded-xl border border-zinc-200/50">
+                            <div>
+                              <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block leading-none">Scans</span>
+                              <span className="text-sm font-black text-zinc-800 mt-1 block">{qr.scan_count || 0}</span>
+                            </div>
+                            <div>
+                              <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block leading-none">Last Scanned</span>
+                              <span className="text-[10px] font-bold text-zinc-650 mt-1 block truncate">
+                                {qr.last_scanned_at ? new Date(qr.last_scanned_at).toLocaleDateString() : 'Never'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Destination details panel */}
+                          {!isEditing ? (
+                            <div className="space-y-1 bg-white p-3 rounded-xl border border-zinc-150 text-xs">
+                              <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block">Destination</span>
+                              <div className="flex items-center justify-between gap-2 mt-0.5">
+                                <span className="text-[9px] font-black text-orange-500 uppercase tracking-wide">
+                                  {qr.destination_type || (qr.assigned_profile_id ? 'profile' : 'custom')}
+                                </span>
+                                <span className="text-[11px] text-zinc-550 font-bold truncate max-w-[150px]">
+                                  {qr.assigned_profile_id ? `Profile (/${qr.profiles?.slug})` : qr.custom_url}
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            /* EDIT DESTINATION STATE CONTAINER */
+                            <div className="space-y-2 bg-white p-3.5 rounded-xl border border-orange-500/20 animate-in slide-in-from-top-1 duration-200">
+                              <span className="text-[9px] font-black text-zinc-555 uppercase tracking-widest block">Edit Destination</span>
+                              
+                              <div className="space-y-2">
+                                <select
+                                  value={editDestType}
+                                  onChange={(e) => setEditDestType(e.target.value as any)}
+                                  className="w-full h-8 px-2 rounded-lg border border-zinc-200 bg-white text-zinc-800 text-[10.5px] font-bold focus:border-orange-500 focus:outline-none appearance-none cursor-pointer"
+                                >
+                                  <option value="profile">Portid Profile</option>
+                                  <option value="custom">Custom URL</option>
+                                </select>
+
+                                {editDestType === 'custom' && (
+                                  <Input
+                                    placeholder="https://example.com"
+                                    value={editDestValue}
+                                    onChange={(e) => setEditDestValue(e.target.value)}
+                                    className="h-8 rounded-lg border-zinc-200 focus:border-orange-500 bg-white text-[10.5px] font-semibold"
+                                  />
+                                )}
+                              </div>
+
+                              <div className="flex gap-2 pt-1">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => setEditingQrId(null)}
+                                  className="flex-1 h-7 rounded-lg border-zinc-200 bg-white text-zinc-700 font-bold text-[9.5px] uppercase tracking-wider"
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  type="button"
+                                  onClick={() => handleSaveDestination(qr.id)}
+                                  disabled={editLoading}
+                                  className="flex-1 h-7 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-bold text-[9.5px] uppercase tracking-wider"
+                                >
+                                  {editLoading ? <Loader2 className="h-3 w-3 animate-spin mx-auto" /> : 'Save'}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Controller Action buttons panel */}
+                          {!isEditing && (
+                            <div className="space-y-3 pt-2 border-t border-zinc-200/60 flex flex-col">
+                              <div className="flex justify-between items-center gap-3">
+                                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block leading-none">Status</span>
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="checkbox"
+                                    checked={!qr.is_paused}
+                                    onChange={() => handleTogglePause(qr.id, qr.is_paused)}
+                                    className="h-3.5 w-3.5 rounded border-zinc-300 text-orange-500 accent-orange-500 cursor-pointer"
+                                  />
+                                  <span className={`text-[10px] font-extrabold uppercase tracking-wide ${!qr.is_paused ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                    {!qr.is_paused ? 'Active' : 'Paused'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2 pt-1">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => startEditingDestination(qr)}
+                                  className="h-8 rounded-xl border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-55 font-bold text-[10px] uppercase tracking-wider"
+                                >
+                                  Edit Dest
+                                </Button>
+                                
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => {
+                                    const color = qr.style?.color || '#f97316';
+                                    const bgColor = qr.style?.transparent ? 'transparent' : (qr.style?.bgColor || '#ffffff');
+                                    const inst = new QRCodeStyling({
+                                      width: 1024,
+                                      height: 1024,
+                                      data: qr.code.startsWith('DYN_') ? `${window.location.origin}/q/${qr.code}` : qr.code,
+                                      dotsOptions: { color, type: (qr.style?.dotsType || 'rounded') as any },
+                                      cornersSquareOptions: { color, type: (qr.style?.cornersSquareType || 'extra-rounded') as any },
+                                      cornersDotOptions: { color, type: (qr.style?.cornersDotType || 'dot') as any },
+                                      backgroundOptions: { color: bgColor }
+                                    });
+                                    inst.download({ name: `qr-${qr.code}`, extension: 'png' });
+                                    toast.success("Download started!");
+                                  }}
+                                  className="h-8 rounded-xl border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-55 font-bold text-[10px] uppercase tracking-wider"
+                                >
+                                  Download
+                                </Button>
+                              </div>
+
+                              {isDynamicCode && (
+                                <Button
+                                  type="button"
+                                  onClick={() => handleDeleteQR(qr.id, qr.code)}
+                                  className="w-full h-8 rounded-xl border border-rose-100 bg-rose-50 hover:bg-rose-100 text-rose-500 hover:text-rose-600 font-bold text-[10px] uppercase tracking-wider transition-all"
+                                >
+                                  Delete QR
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+              )}
+
+              <ProfileAnalytics embedded={true} profileId={profileData.id} />
+            </div>
           ) : (
             <EditProfile passedId={profileData.id} forcedTab={activeTab} embedded={true} />
           )}

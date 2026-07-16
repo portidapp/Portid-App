@@ -427,8 +427,8 @@ const AdminDashboard = () => {
       setUsers(usersRes.data ?? []);
       setUserPlans(plansRes.data as UserPlan[] ?? []);
       setAnalytics(analyticsRes.data ?? []);
-      setEnquiries(enquiriesRes.data ?? []);
-      setQrCodes(qrCodesRes.data || []);
+      setEnquiries((enquiriesRes.data as unknown as SupportEnquiry[]) ?? []);
+      setQrCodes((qrCodesRes.data as unknown as QRCodeData[]) || []);
     } catch (err) {
       console.error("Admin fetch error:", err);
       toast.error("Failed to load administration data.");
@@ -444,7 +444,7 @@ const AdminDashboard = () => {
         .select('*, profiles(id, brand_name, slug)')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      setQrCodes(data || []);
+      setQrCodes((data as unknown as QRCodeData[]) || []);
     } catch (err: any) {
       console.error("Error fetching QR codes:", err);
     }
@@ -709,7 +709,7 @@ const AdminDashboard = () => {
   const handleUpdateRole = async (userId: string, newRole: string) => {
     const { error } = await supabase
       .from('user_roles')
-      .upsert({ user_id: userId, role: newRole }, { onConflict: 'user_id' });
+      .upsert({ user_id: userId, role: newRole as "admin" | "user" }, { onConflict: 'user_id' });
 
     if (error) {
       toast.error(error.message);

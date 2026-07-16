@@ -13,6 +13,7 @@ interface QRCodeData {
   status: 'available' | 'assigned';
   assigned_profile_id: string | null;
   custom_url: string | null;
+  is_paused?: boolean;
   profiles: {
     slug: string;
   } | null;
@@ -25,7 +26,7 @@ const QRRedirect: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   
   const [loading, setLoading] = useState(true);
-  const [errorType, setErrorType] = useState<'invalid' | 'unassigned' | null>(null);
+  const [errorType, setErrorType] = useState<'invalid' | 'unassigned' | 'paused' | null>(null);
   const [qrData, setQrData] = useState<QRCodeData | null>(null);
   
   // Claiming flow states
@@ -45,7 +46,7 @@ const QRRedirect: React.FC = () => {
       try {
         const { data, error } = await supabase
           .from('qr_codes')
-          .select('id, code, status, assigned_profile_id, custom_url, profiles(slug)')
+          .select('id, code, status, assigned_profile_id, custom_url, is_paused, profiles(slug)')
           .eq('code', code)
           .maybeSingle();
 
@@ -66,6 +67,18 @@ const QRRedirect: React.FC = () => {
         setQrData(retrievedQr);
 
         if (retrievedQr.status === 'assigned') {
+          if (retrievedQr.is_paused) {
+            setErrorType('paused');
+            setLoading(false);
+            return;
+          }
+
+          // Track scan count asynchronously
+          supabase.rpc('track_qr_scan', { qr_id: retrievedQr.id }).then(
+            () => {},
+            (err) => console.error('Error tracking QR scan:', err)
+          );
+
           if (retrievedQr.custom_url) {
             let redirectUrl = retrievedQr.custom_url;
             if (!/^https?:\/\//i.test(redirectUrl)) {
@@ -224,6 +237,32 @@ const QRRedirect: React.FC = () => {
                 <a href="mailto:support@portid.in?subject=Invalid QR Code Setup">
                   Contact Support
                 </a>
+              </Button>
+            </div>
+          </div>
+        ) : errorType === 'paused' ? (
+          <div className="space-y-6">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+              <ShieldAlert className="h-8 w-8 text-amber-500" />
+            </div>
+            
+            <div className="space-y-2">
+              <h1 className="text-2xl font-heading font-black tracking-tight text-zinc-900">
+                QR Code Paused
+              </h1>
+              <p className="text-sm font-semibold text-zinc-500 leading-relaxed px-4">
+                This QR code has been temporarily paused by its owner. Please scan again later.
+              </p>
+            </div>
+
+            <div className="pt-4 border-t border-zinc-100">
+              <Button
+                asChild
+                className="w-full h-12 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-orange-500/20"
+              >
+                <Link to="/">
+                  <ArrowLeft className="mr-2 h-4 w-4" /> Go to Home
+                </Link>
               </Button>
             </div>
           </div>

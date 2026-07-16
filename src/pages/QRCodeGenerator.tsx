@@ -7,12 +7,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   QrCode, Globe, MessageSquare, Instagram, Star, MapPin, Utensils,
   CreditCard, User, Wifi, Mail, Phone, FileText, Sparkles, Download,
-  Copy, Plus, ChevronDown, Check, Upload, Trash2, ArrowLeft, Eye, Crown
+  Copy, Plus, ChevronDown, Check, Upload, Trash2, ArrowLeft, Eye, Crown,
+  Loader2, Camera, ShieldAlert, ExternalLink, Link as LinkIcon, AlertTriangle, ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import QRCodeStyling from 'qr-code-styling';
+import { Html5Qrcode } from 'html5-qrcode';
 
 interface UserProfile {
   id: string;
@@ -180,7 +182,27 @@ const getCornersDotIcon = (type: string) => {
 
 const QRCodeGenerator: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, planTier } = useAuth();
+
+  // Connect Printed QR mode states
+  const [mode, setMode] = useState<'create' | 'connect'>('create');
+  const [scanState, setScanState] = useState<'idle' | 'scanning' | 'checking' | 'unassigned' | 'assigned' | 'success' | 'error'>('idle');
+  const [scannedCode, setScannedCode] = useState('');
+  const [qrData, setQrData] = useState<any>(null);
+  const [connectType, setConnectType] = useState<'profile' | 'url'>('profile');
+  const [customUrl, setCustomUrl] = useState('');
+  const [manualCodeInput, setManualCodeInput] = useState('');
+  const [scannerError, setScannerError] = useState('');
+  const [connectLoading, setConnectLoading] = useState(false);
+  const [unlinkLoading, setUnlinkLoading] = useState(false);
+
+  // Html5Qrcode instance ref
+  const html5QrCodeRef = useRef<any>(null);
+
+  // New inline Dynamic QR states
+  const [savedDynamicCode, setSavedDynamicCode] = useState<string>('');
+  const [isDynamicSaved, setIsDynamicSaved] = useState<boolean>(false);
+  const [dynamicRedirectType, setDynamicRedirectType] = useState<'url' | 'profile'>('url');
   
   // Tab types
   const [activeTab, setActiveTab] = useState<'website' | 'whatsapp' | 'instagram' | 'review' | 'location' | 'menu' | 'payment' | 'vcard' | 'wifi' | 'email' | 'phone' | 'text'>('website');
@@ -314,6 +336,11 @@ const QRCodeGenerator: React.FC = () => {
     fetchProfiles();
   }, [user]);
 
+  // Resolve current QR Data (Static or Dynamic saved)
+  const currentQrData = isDynamic && isDynamicSaved && savedDynamicCode
+    ? `${window.location.origin}/q/${savedDynamicCode}`
+    : qrValue;
+
   // QR rendering instances
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const qrCodeRef = useRef<QRCodeStyling | null>(null);
@@ -323,7 +350,7 @@ const QRCodeGenerator: React.FC = () => {
       width: 260,
       height: 260,
       type: 'svg',
-      data: qrValue,
+      data: currentQrData,
       margin: 15,
       dotsOptions: {
         color: qrColor,
@@ -344,7 +371,7 @@ const QRCodeGenerator: React.FC = () => {
       imageOptions: {
         crossOrigin: 'anonymous',
         margin: 5,
-        imageSizeFactor: 0.35
+        imageSize: 0.35
       }
     });
 
@@ -354,7 +381,7 @@ const QRCodeGenerator: React.FC = () => {
       previewContainerRef.current.innerHTML = '';
       qrCode.append(previewContainerRef.current);
     }
-  }, [qrValue]);
+  }, [currentQrData]);
 
   useEffect(() => {
     if (qrCodeRef.current) {
@@ -396,7 +423,7 @@ const QRCodeGenerator: React.FC = () => {
   const handleDownload = async (format: 'png' | 'svg') => {
     try {
       const downloadName = `portid-qr-${activeTab}`;
-      const urlToEncode = isDynamic && user ? `${window.location.origin}/q/DYN_${Math.random().toString(36).substring(2, 8).toUpperCase()}` : qrValue;
+      const urlToEncode = currentQrData;
       
       const qrCode = new QRCodeStyling({
         width: 1024,
@@ -423,7 +450,7 @@ const QRCodeGenerator: React.FC = () => {
         imageOptions: {
           crossOrigin: 'anonymous',
           margin: 15,
-          imageSizeFactor: 0.35
+          imageSize: 0.35
         }
       });
 
@@ -431,7 +458,7 @@ const QRCodeGenerator: React.FC = () => {
       if (frameText && format === 'png') {
         const rawCanvas = await qrCode.getRawData('png');
         if (!rawCanvas) return;
-        const blobUrl = URL.createObjectURL(rawCanvas);
+        const blobUrl = URL.createObjectURL(rawCanvas as Blob);
         
         const img = new Image();
         img.onload = () => {
@@ -499,7 +526,7 @@ const QRCodeGenerator: React.FC = () => {
   };
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(qrValue);
+    navigator.clipboard.writeText(currentQrData);
     toast.success("QR Code content copied to clipboard!");
   };
 
@@ -510,6 +537,30 @@ const QRCodeGenerator: React.FC = () => {
     }
 
     setSavingLoading(true);
+
+    // Limit check for free tier: 1 dynamic QR max
+    const isFree = planTier !== 'premium';
+    if (isFree) {
+      try {
+        const { count, error } = await supabase
+          .from('qr_codes')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .like('code', 'DYN_%');
+
+        if (error) throw error;
+
+        if (count && count >= 1) {
+          toast.error("Free plan limit reached: You can only create 1 dynamic QR code. Upgrade to Premium for unlimited codes.");
+          setShowUpgradeModal(true);
+          setSavingLoading(false);
+          return;
+        }
+      } catch (err) {
+        console.error("Error verifying dynamic QR count limit:", err);
+      }
+    }
+
     const newCode = `DYN_${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     const dynamicStyle = {
       color: qrColor,
@@ -529,10 +580,12 @@ const QRCodeGenerator: React.FC = () => {
         style: dynamicStyle
       };
 
-      if (selectedProfileId) {
+      if (dynamicRedirectType === 'profile' && selectedProfileId) {
         payload.assigned_profile_id = selectedProfileId;
+        payload.destination_type = 'profile';
       } else {
         payload.custom_url = qrValue;
+        payload.destination_type = 'custom';
       }
 
       const { error } = await supabase
@@ -542,7 +595,9 @@ const QRCodeGenerator: React.FC = () => {
       if (error) throw error;
 
       toast.success(`Successfully saved Dynamic QR code ${newCode} to your account!`);
-      setIsDynamic(true);
+      setSavedDynamicCode(newCode);
+      setIsDynamicSaved(true);
+      fetchDynamicCodesCount();
     } catch (err: any) {
       console.error("Save dynamic error:", err);
       toast.error(err.message || "Failed to save dynamic QR code.");
@@ -550,6 +605,253 @@ const QRCodeGenerator: React.FC = () => {
       setSavingLoading(false);
     }
   };
+
+  const handleResetDynamic = () => {
+    setSavedDynamicCode('');
+    setIsDynamicSaved(false);
+  };
+
+  const handleDynamicToggle = (checked: boolean) => {
+    setIsDynamic(checked);
+    if (!checked) {
+      handleResetDynamic();
+    }
+  };
+
+  // Connect Printed QR feature methods
+  const startScanner = async () => {
+    setScannerError('');
+    setScanState('scanning');
+    
+    // Allow React to render the div element first
+    setTimeout(async () => {
+      try {
+        const html5QrCode = new Html5Qrcode("qr-reader");
+        html5QrCodeRef.current = html5QrCode;
+        
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          {
+            fps: 10,
+            qrbox: (width, height) => {
+              const size = Math.min(width, height) * 0.7;
+              return { width: size, height: size };
+            }
+          },
+          (decodedText) => {
+            // Found QR Code!
+            handleQRCodeScanned(decodedText);
+          },
+          (errorMessage) => {
+            // Verbose error, ignore
+          }
+        );
+      } catch (err: any) {
+        console.error("Scanner start error:", err);
+        setScannerError(err.message || "Failed to access camera. Please make sure permissions are granted.");
+        setScanState('error');
+      }
+    }, 100);
+  };
+
+  const stopScanner = async () => {
+    if (html5QrCodeRef.current) {
+      try {
+        if (html5QrCodeRef.current.isScanning) {
+          await html5QrCodeRef.current.stop();
+        }
+      } catch (err) {
+        console.error("Error stopping scanner:", err);
+      }
+      html5QrCodeRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      stopScanner();
+    };
+  }, []);
+
+  const extractCode = (text: string): string => {
+    if (text.includes('/q/')) {
+      const parts = text.split('/q/');
+      if (parts.length > 1) {
+        const codePart = parts[1].split('?')[0].split('#')[0];
+        return codePart.trim();
+      }
+    }
+    return text.trim();
+  };
+
+  const handleQRCodeScanned = async (text: string) => {
+    await stopScanner();
+    const code = extractCode(text);
+    setScannedCode(code);
+    await checkCodeInDatabase(code);
+  };
+
+  const handleManualVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualCodeInput.trim()) return;
+    const code = extractCode(manualCodeInput);
+    setScannedCode(code);
+    await checkCodeInDatabase(code);
+  };
+
+  const checkCodeInDatabase = async (code: string) => {
+    setScanState('checking');
+    try {
+      const { data, error } = await supabase
+        .from('qr_codes')
+        .select('*, profiles(slug, brand_name)')
+        .eq('code', code)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (!data) {
+        setScannerError(`QR code "${code}" is not registered in our system.`);
+        setScanState('error');
+        return;
+      }
+
+      setQrData(data);
+      if (data.status === 'assigned') {
+        setScanState('assigned');
+      } else {
+        setScanState('unassigned');
+        setCustomUrl('');
+      }
+    } catch (err: any) {
+      console.error("Error checking QR code:", err);
+      setScannerError(err.message || "Failed to check QR code in the database.");
+      setScanState('error');
+    }
+  };
+
+  const handleConnectQR = async () => {
+    if (!user) {
+      toast.error("You must be logged in to claim a QR code.");
+      return;
+    }
+    setConnectLoading(true);
+    try {
+      const isProfile = connectType === 'profile';
+      const profileId = isProfile ? selectedProfileId : null;
+      let targetUrl = isProfile ? null : customUrl.trim();
+
+      if (!isProfile) {
+        if (!targetUrl) {
+          toast.error("Please enter a custom URL.");
+          setConnectLoading(false);
+          return;
+        }
+        if (!/^https?:\/\//i.test(targetUrl)) {
+          targetUrl = 'https://' + targetUrl;
+        }
+        try {
+          new URL(targetUrl);
+        } catch (_) {
+          toast.error("Please enter a valid web URL.");
+          setConnectLoading(false);
+          return;
+        }
+      } else {
+        if (!profileId) {
+          toast.error("Please select a profile to connect.");
+          setConnectLoading(false);
+          return;
+        }
+      }
+
+      // Secure claim: check status is available to prevent race conditions
+      const { data, error } = await supabase
+        .from('qr_codes')
+        .update({
+          user_id: user.id,
+          assigned_profile_id: profileId,
+          custom_url: targetUrl,
+          status: 'assigned'
+        })
+        .eq('code', scannedCode)
+        .eq('status', 'available')
+        .select('*, profiles(slug, brand_name)');
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        throw new Error("This QR code is no longer available or was already connected.");
+      }
+
+      setQrData(data[0]);
+      setScanState('success');
+      toast.success("QR Code successfully connected!");
+    } catch (err: any) {
+      console.error("Error connecting QR code:", err);
+      toast.error(err.message || "Failed to connect QR code.");
+    } finally {
+      setConnectLoading(false);
+    }
+  };
+
+  const handleUnlinkQR = async () => {
+    if (!user || !qrData) return;
+    
+    const confirmUnlink = window.confirm("Are you sure you want to disconnect this physical QR code? It will become available for anyone to claim.");
+    if (!confirmUnlink) return;
+
+    setUnlinkLoading(true);
+    try {
+      const { error } = await supabase
+        .from('qr_codes')
+        .update({
+          user_id: null,
+          assigned_profile_id: null,
+          custom_url: null,
+          status: 'available'
+        })
+        .eq('id', qrData.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast.success("QR Code successfully unlinked.");
+      setQrData(null);
+      setScannedCode('');
+      setScanState('idle');
+    } catch (err: any) {
+      console.error("Error unlinking QR code:", err);
+      toast.error(err.message || "Failed to unlink QR code.");
+    } finally {
+      setUnlinkLoading(false);
+    }
+  };
+
+  const [dynamicCodesCount, setDynamicCodesCount] = useState<number>(0);
+
+  const fetchDynamicCodesCount = async () => {
+    if (!user) return;
+    try {
+      const { count, error } = await supabase
+        .from('qr_codes')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .like('code', 'DYN_%');
+      if (error) throw error;
+      setDynamicCodesCount(count || 0);
+    } catch (err) {
+      console.error("Error fetching dynamic QR count:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchDynamicCodesCount();
+    }
+  }, [user]);
+
+  const isDownloadDisabled = isDynamic && !isDynamicSaved;
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-800 font-sans pb-20">
@@ -576,7 +878,7 @@ const QRCodeGenerator: React.FC = () => {
       </header>
 
       {/* Hero section */}
-      <div className="py-12 sm:py-16 text-center max-w-3xl mx-auto px-4">
+      <div className="py-12 sm:py-16 text-center max-w-3xl mx-auto px-4 pb-4">
         <span className="bg-orange-500/10 border border-orange-500/20 text-orange-500 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest inline-block mb-4">
           Free Custom generator
         </span>
@@ -586,11 +888,77 @@ const QRCodeGenerator: React.FC = () => {
         <p className="text-sm sm:text-base font-semibold text-zinc-500 mt-4 leading-relaxed max-w-xl mx-auto">
           Paste your link, customize your QR, and download instantly. No login required.
         </p>
+
+        {/* Dynamic QR CTA */}
+        <div className="mt-10 flex flex-col items-center justify-center relative group max-w-lg mx-auto">
+          {/* Animated Background Blur */}
+          <div className="absolute inset-0 bg-gradient-to-r from-orange-400 to-rose-400 blur-2xl opacity-20 group-hover:opacity-40 transition-opacity duration-700 rounded-full" />
+          
+          <Link to="/pricing" className="relative w-full">
+            <motion.div
+              whileHover={{ scale: 1.02, y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 sm:px-8 py-5 sm:py-6 rounded-3xl bg-gradient-to-br from-orange-500 via-rose-500 to-orange-600 text-white shadow-2xl shadow-orange-500/25 border border-white/20 relative overflow-hidden"
+            >
+              {/* Glass reflection effect */}
+              <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full duration-1000 transition-transform" />
+              
+              <div className="flex items-center gap-4 relative z-10 w-full sm:w-auto">
+                <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md shadow-inner border border-white/10 shrink-0">
+                  <QrCode className="w-8 h-8 text-white" />
+                </div>
+                <div className="text-left flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Sparkles className="w-3.5 h-3.5 text-orange-200" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-orange-100">Premium Feature</span>
+                  </div>
+                  <h3 className="font-black text-xl sm:text-2xl tracking-tight leading-none text-white drop-shadow-sm">
+                    Get Your Dynamic QR
+                  </h3>
+                  <p className="text-sm font-medium text-white/90 mt-1.5 leading-snug">
+                    Connect anything to your QR. Change the link anytime without reprinting!
+                  </p>
+                </div>
+              </div>
+              
+              <div className="hidden sm:flex items-center justify-center w-12 h-12 bg-white/20 rounded-full backdrop-blur-md group-hover:bg-white/30 transition-colors shrink-0">
+                <ChevronRight className="w-6 h-6 text-white group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </motion.div>
+          </Link>
+          
+          {/* Floating animated elements */}
+          <motion.div 
+            animate={{ y: [0, -10, 0] }} 
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute -left-6 sm:-left-10 top-0 sm:top-2 bg-white/90 backdrop-blur-sm p-3 rounded-2xl shadow-xl shadow-pink-500/10 border border-zinc-100 rotate-[-12deg]"
+          >
+            <Instagram className="w-6 h-6 text-pink-500" />
+          </motion.div>
+          
+          <motion.div 
+            animate={{ y: [0, 12, 0] }} 
+            transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+            className="absolute -right-4 sm:-right-8 -top-4 sm:-top-2 bg-white/90 backdrop-blur-sm p-3 rounded-2xl shadow-xl shadow-blue-500/10 border border-zinc-100 rotate-[10deg]"
+          >
+            <Globe className="w-6 h-6 text-blue-500" />
+          </motion.div>
+          
+          <motion.div 
+            animate={{ y: [0, -8, 0], rotate: [5, 10, 5] }} 
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+            className="absolute right-4 sm:right-6 -bottom-6 sm:-bottom-8 bg-white/90 backdrop-blur-sm p-3 rounded-2xl shadow-xl shadow-emerald-500/10 border border-zinc-100"
+          >
+            <CreditCard className="w-6 h-6 text-emerald-500" />
+          </motion.div>
+        </div>
+
       </div>
 
-      <main className="max-w-6xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      {mode === 'create' ? (
+        <main className="max-w-6xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column - Customizer Panel */}
-        <section className="lg:col-span-8 space-y-6">
+        <section className="lg:col-span-8 space-y-6 order-2 lg:order-1">
           
           {/* 12 QR Type selectors */}
           <Card className="bg-white border-zinc-200/80 rounded-3xl shadow-sm p-6">
@@ -904,6 +1272,8 @@ const QRCodeGenerator: React.FC = () => {
                 )}
               </div>
             </div>
+
+
           </Card>
 
           {/* Style Customization Accordion */}
@@ -934,7 +1304,7 @@ const QRCodeGenerator: React.FC = () => {
                       );
                     })}
                     {/* Custom Color picker */}
-                    <div className="w-7 h-7 rounded-full border border-zinc-300 bg-gradient-to-tr from-rose-450 via-emerald-450 to-blue-450 relative flex items-center justify-center cursor-pointer hover:scale-105 overflow-hidden">
+                    <div className="w-7 h-7 rounded-full border border-zinc-300 bg-gradient-to-tr from-rose-500 via-emerald-500 to-blue-500 relative flex items-center justify-center cursor-pointer hover:scale-105 overflow-hidden">
                       <input
                         type="color"
                         value={qrColor}
@@ -1207,7 +1577,7 @@ const QRCodeGenerator: React.FC = () => {
         </section>
 
         {/* Right Column - Live Preview / Dynamic Claims */}
-        <aside className="lg:col-span-4 lg:sticky lg:top-24 space-y-6">
+        <aside className="lg:col-span-4 lg:sticky lg:top-24 space-y-6 order-1 lg:order-2">
           
           {/* Main Preview Container */}
           <Card className="bg-white border-zinc-200/80 rounded-[2.5rem] shadow-sm p-6 flex flex-col items-center justify-center space-y-5">
@@ -1251,7 +1621,8 @@ const QRCodeGenerator: React.FC = () => {
                 type="button"
                 variant="outline"
                 onClick={handleCopyLink}
-                className="flex-1 h-11 rounded-xl border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 text-xs font-bold uppercase tracking-wider"
+                disabled={isDownloadDisabled}
+                className="flex-1 h-11 rounded-xl border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 text-xs font-bold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Copy className="h-4 w-4 mr-2" /> Copy Link
               </Button>
@@ -1262,111 +1633,527 @@ const QRCodeGenerator: React.FC = () => {
               <Button
                 type="button"
                 onClick={() => handleDownload('png')}
-                className="h-11 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 text-xs font-black uppercase tracking-widest"
+                disabled={isDownloadDisabled}
+                className="h-11 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 text-xs font-black uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Download className="h-4 w-4 mr-2" /> PNG
               </Button>
               <Button
                 type="button"
                 onClick={() => handleDownload('svg')}
-                className="h-11 rounded-xl border border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50 text-xs font-black uppercase tracking-widest"
+                disabled={isDownloadDisabled}
+                className="h-11 rounded-xl border border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50 text-xs font-black uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Download className="h-4 w-4 mr-2" /> SVG
               </Button>
             </div>
 
-            {/* Logged in custom claims / dynamic setup */}
-            {user ? (
-              <div className="w-full border-t border-zinc-150 pt-4 space-y-3 text-left">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block ml-1">Dynamic Redirect settings</span>
-                  <div className="flex items-center gap-1">
-                    <input
-                      id="dynamic-toggle"
-                      type="checkbox"
-                      checked={isDynamic}
-                      onChange={e => setIsDynamic(e.target.checked)}
-                      className="h-3.5 w-3.5 rounded border-zinc-300 text-orange-500 accent-orange-500 cursor-pointer"
-                    />
-                    <label htmlFor="dynamic-toggle" className="text-[10px] font-bold text-orange-500 uppercase tracking-wider cursor-pointer">
-                      Dynamic
-                    </label>
+            {isDownloadDisabled && (
+              <p className="text-[10px] text-amber-600 font-semibold text-center mt-2 animate-pulse bg-amber-500/5 py-1.5 px-3 rounded-lg border border-amber-500/10">
+                ⚠️ Click "Generate Dynamic QR" first to copy or download.
+              </p>
+            )}
+
+            {isDynamic && isDynamicSaved && (
+              <div className="w-full border-t border-zinc-150 pt-4 text-left space-y-2 animate-in fade-in duration-300">
+                <div className="bg-emerald-50 border border-emerald-200/60 p-4 rounded-2xl">
+                  <div className="flex items-center gap-1.5 text-emerald-600 mb-1.5">
+                    <Sparkles className="h-4 w-4" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Dynamic QR Active</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-650 leading-relaxed font-semibold">
+                    Code: <code className="bg-white/80 border border-zinc-150 text-zinc-800 px-1 py-0.5 rounded font-mono font-bold">{savedDynamicCode}</code>
+                  </p>
+                  <p className="text-[10px] text-zinc-550 mt-1 leading-relaxed">
+                    Redirecting to: <span className="font-bold text-zinc-700 truncate block max-w-full">{dynamicRedirectType === 'profile' && selectedProfileId ? `Profile ID: ${selectedProfileId}` : qrValue}</span>
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleResetDynamic}
+                  className="w-full h-9 rounded-xl border-zinc-200 text-zinc-500 hover:text-zinc-700 text-[10px] font-bold uppercase tracking-wider"
+                >
+                  Create Another / Design New
+                </Button>
+              </div>
+            )}
+          </Card>
+        </aside>
+      </main>
+      ) : (
+        <main className="max-w-2xl mx-auto px-4 pb-12 animate-in fade-in duration-300">
+          <Card className="bg-white border-zinc-200/80 rounded-[2.5rem] shadow-sm p-6 sm:p-8 text-center space-y-6">
+            
+            {/* IDLE STATE */}
+            {scanState === 'idle' && (
+              <div className="space-y-6 py-4">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-orange-500/10 text-orange-500 border border-orange-500/20 shadow-sm animate-pulse">
+                  <QrCode className="h-8 w-8" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight">Connect Physical QR Code</h2>
+                  <p className="text-xs sm:text-sm text-zinc-500 font-semibold leading-relaxed max-w-md mx-auto">
+                    Claim and manage your printed Portid card, sticker, or stand by scanning the QR code using your device's camera.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-3 max-w-sm mx-auto pt-4">
+                  {user ? (
+                    <Button
+                      onClick={startScanner}
+                      className="h-12 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                    >
+                      <Camera className="h-4 w-4" /> Start Camera Scanner
+                    </Button>
+                  ) : (
+                    <div className="space-y-4">
+                      <p className="text-xs font-semibold text-rose-500 bg-rose-50 border border-rose-100 p-3.5 rounded-xl">
+                        You must be logged in to claim and link physical QR codes to your account.
+                      </p>
+                      <Button
+                        asChild
+                        className="w-full h-12 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-orange-500/20"
+                      >
+                        <Link to="/login" state={{ from: { pathname: '/qr-code-generator' } }}>
+                          Log In to Connect
+                        </Link>
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Manual fallback input */}
+                  {user && (
+                    <div className="pt-6 border-t border-zinc-100 mt-4 space-y-3">
+                      <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block">
+                        Or enter code ID manually
+                      </span>
+                      <form onSubmit={handleManualVerify} className="flex gap-2">
+                        <Input
+                          placeholder="e.g. DYN_ABCDEF"
+                          value={manualCodeInput}
+                          onChange={(e) => setManualCodeInput(e.target.value)}
+                          className="h-11 rounded-xl border-zinc-200 focus:border-orange-500 bg-zinc-50 font-mono text-xs uppercase"
+                        />
+                        <Button
+                          type="submit"
+                          variant="outline"
+                          className="h-11 rounded-xl border-zinc-200 bg-white text-zinc-700 font-bold text-xs uppercase tracking-wider px-4"
+                        >
+                          Verify
+                        </Button>
+                      </form>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* SCANNING STATE */}
+            {scanState === 'scanning' && (
+              <div className="space-y-6 py-4">
+                <div className="space-y-2">
+                  <h2 className="text-xl font-black text-zinc-900 tracking-tight">Scan Physical QR Code</h2>
+                  <p className="text-xs text-zinc-500 font-semibold leading-relaxed">
+                    Point your device's camera at the printed Portid QR code.
+                  </p>
+                </div>
+
+                <div className="relative mx-auto w-full max-w-sm aspect-square overflow-hidden rounded-2xl border-2 border-dashed border-orange-500 bg-zinc-950 flex items-center justify-center shadow-lg">
+                  {/* Camera Video Node */}
+                  <div id="qr-reader" className="w-full h-full" />
+                  
+                  {/* Overlay scanning reticle */}
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    <div className="w-[60%] h-[60%] border-2 border-orange-500 rounded-2xl relative shadow-[0_0_0_9999px_rgba(9,9,11,0.5)]">
+                      <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-white rounded-tl" />
+                      <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-white rounded-tr" />
+                      <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-white rounded-bl" />
+                      <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-white rounded-br" />
+                    </div>
                   </div>
                 </div>
 
-                {isDynamic && (
-                  <div className="space-y-3 pt-1 animate-in fade-in duration-200">
-                    <div className="space-y-1">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    stopScanner();
+                    setScanState('idle');
+                  }}
+                  className="h-11 rounded-xl border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 font-bold text-xs uppercase tracking-wider px-6"
+                >
+                  Cancel Scanner
+                </Button>
+              </div>
+            )}
+
+            {/* CHECKING STATE */}
+            {scanState === 'checking' && (
+              <div className="py-12 space-y-4">
+                <Loader2 className="h-10 w-10 animate-spin text-orange-500 mx-auto" />
+                <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider">
+                  Verifying code in database...
+                </p>
+              </div>
+            )}
+
+            {/* UNASSIGNED/AVAILABLE STATE */}
+            {scanState === 'unassigned' && (
+              <div className="space-y-6 text-left max-w-md mx-auto py-2">
+                <div className="text-center space-y-2">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                    <Sparkles className="h-6 w-6" />
+                  </div>
+                  <h2 className="text-xl font-black text-zinc-900 tracking-tight">QR Code Available!</h2>
+                  <p className="text-xs text-zinc-500 font-semibold">
+                    Code: <code className="bg-zinc-100 text-zinc-800 px-1.5 py-0.5 rounded font-mono font-bold text-[11px]">{scannedCode}</code>
+                  </p>
+                </div>
+
+                <div className="space-y-4 pt-4 border-t border-zinc-100">
+                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block ml-1">
+                    Select Destination Type
+                  </span>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setConnectType('profile')}
+                      className={`flex flex-col items-center justify-center p-4 rounded-2xl border text-center transition-all ${
+                        connectType === 'profile'
+                          ? 'bg-orange-500/10 border-orange-500 text-orange-500'
+                          : 'bg-zinc-50 border-zinc-200 text-zinc-500 hover:text-zinc-800'
+                      }`}
+                    >
+                      <User className="h-5 w-5 mb-1" />
+                      <span className="text-xs font-bold">Portid Profile</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConnectType('url')}
+                      className={`flex flex-col items-center justify-center p-4 rounded-2xl border text-center transition-all ${
+                        connectType === 'url'
+                          ? 'bg-orange-500/10 border-orange-500 text-orange-500'
+                          : 'bg-zinc-50 border-zinc-200 text-zinc-500 hover:text-zinc-800'
+                      }`}
+                    >
+                      <LinkIcon className="h-5 w-5 mb-1" />
+                      <span className="text-xs font-bold">Custom URL</span>
+                    </button>
+                  </div>
+
+                  {connectType === 'profile' && (
+                    <div className="space-y-1.5 animate-in fade-in duration-200">
                       <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block ml-1">
                         Connect to Portid Profile
                       </label>
                       {userProfiles.length === 0 ? (
-                        <p className="text-[10px] text-zinc-400 leading-normal ml-1">
-                          You don't have any business profiles. Create one to link this dynamic QR code.
-                        </p>
+                        <div className="space-y-3 p-4 bg-zinc-50 rounded-2xl border border-zinc-200/60 text-center">
+                          <p className="text-[11px] text-zinc-400 leading-normal">
+                            You don't have any business profiles. Create one to link this dynamic QR code.
+                          </p>
+                          <Button asChild className="h-9 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-[10px] font-bold uppercase tracking-wider">
+                            <Link to="/create-profile">Create Profile</Link>
+                          </Button>
+                        </div>
                       ) : (
                         <div className="relative">
                           <select
                             value={selectedProfileId}
-                            onChange={e => setSelectedProfileId(e.target.value)}
-                            className="w-full h-10 pl-3 pr-10 rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-850 text-xs font-semibold focus:border-orange-500 focus:outline-none appearance-none cursor-pointer"
+                            onChange={(e) => setSelectedProfileId(e.target.value)}
+                            className="w-full h-11 pl-3 pr-10 rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-850 text-xs font-bold focus:border-orange-500 focus:outline-none appearance-none cursor-pointer"
                           >
-                            <option value="">Redirect to raw URL (Custom)</option>
-                            {userProfiles.map(p => (
+                            {userProfiles.map((p) => (
                               <option key={p.id} value={p.id}>
                                 {p.brand_name} (/{p.slug})
                               </option>
                             ))}
                           </select>
                           <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-zinc-400">
-                            <ChevronDown className="h-3.5 w-3.5" />
+                            <ChevronDown className="h-4 w-4" />
                           </div>
                         </div>
                       )}
                     </div>
+                  )}
 
-                    <Button
-                      type="button"
-                      onClick={handleSaveDynamicQR}
-                      disabled={savingLoading}
-                      className="w-full h-11 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-orange-500/20"
-                    >
-                      {savingLoading ? (
-                        <div className="flex items-center gap-1 justify-center">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span>Saving Dynamic QR...</span>
-                        </div>
-                      ) : (
-                        <span>Save Dynamic QR</span>
-                      )}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              // Upgrade CTA card for Guest Users
-              <div className="w-full border-t border-zinc-150 pt-4 text-left animate-in fade-in duration-300">
-                <div className="p-4 bg-orange-500/5 border border-orange-500/10 rounded-2xl space-y-3">
-                  <div className="flex items-center gap-1.5 text-orange-500">
-                    <Crown className="h-4 w-4 animate-bounce" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Want to edit this QR later?</span>
-                  </div>
-                  <p className="text-[11px] text-zinc-500 font-semibold leading-relaxed">
-                    Convert this to a <strong>Dynamic QR code</strong> to change links anytime without reprinting, track scans, capture leads, and setup physical NFC stands.
-                  </p>
+                  {connectType === 'url' && (
+                    <div className="space-y-1.5 animate-in fade-in duration-200">
+                      <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block ml-1">
+                        Target Custom URL
+                      </label>
+                      <Input
+                        placeholder="https://mywebsite.com"
+                        value={customUrl}
+                        onChange={(e) => setCustomUrl(e.target.value)}
+                        className="h-11 rounded-xl border-zinc-200 focus:border-orange-500 bg-zinc-50 text-xs font-semibold"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-6 border-t border-zinc-150">
                   <Button
                     type="button"
-                    onClick={() => setShowUpgradeModal(true)}
-                    className="w-full h-9 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-[10px] font-bold uppercase tracking-wider shadow-sm"
+                    variant="outline"
+                    onClick={() => {
+                      setQrData(null);
+                      setScannedCode('');
+                      setScanState('idle');
+                    }}
+                    className="h-11 rounded-xl border-zinc-200 bg-white text-zinc-700 font-bold text-xs uppercase tracking-wider"
                   >
-                    Upgrade to Dynamic QR
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleConnectQR}
+                    disabled={connectLoading || (connectType === 'profile' && userProfiles.length === 0)}
+                    className="h-11 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-orange-500/20"
+                  >
+                    {connectLoading ? (
+                      <div className="flex items-center gap-1 justify-center">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>Connecting...</span>
+                      </div>
+                    ) : (
+                      <span>Connect QR Code</span>
+                    )}
                   </Button>
                 </div>
               </div>
             )}
+
+            {/* ASSIGNED STATE */}
+            {scanState === 'assigned' && (
+              <div className="space-y-6 text-left max-w-md mx-auto py-2">
+                {qrData?.user_id === user?.id ? (
+                  /* OWNED BY ME STATE */
+                  <>
+                    <div className="text-center space-y-2">
+                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-orange-500/10 text-orange-500 border border-orange-500/20 shadow-sm">
+                        <Check className="h-6 w-6 stroke-[3]" />
+                      </div>
+                      <h2 className="text-xl font-black text-zinc-900 tracking-tight">QR Connected to Your Account</h2>
+                      <p className="text-xs text-zinc-500 font-semibold">
+                        Code ID: <code className="bg-zinc-100 text-zinc-800 px-1.5 py-0.5 rounded font-mono font-bold text-[11px]">{scannedCode}</code>
+                      </p>
+                    </div>
+
+                    <div className="space-y-4 pt-4 border-t border-zinc-100">
+                      <div className="p-4 bg-zinc-50 border border-zinc-200/60 rounded-2xl space-y-2">
+                        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block">
+                          Current Destination
+                        </span>
+                        {qrData?.assigned_profile_id ? (
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs font-bold text-zinc-800">{qrData?.profiles?.brand_name || 'Portid Profile'}</p>
+                              <p className="text-[10px] text-zinc-500 font-semibold">/{qrData?.profiles?.slug}</p>
+                            </div>
+                            <Button asChild variant="link" className="h-auto p-0 text-xs text-blue-650 hover:text-blue-750 font-bold uppercase tracking-wider">
+                              <a href={`/p/${qrData?.profiles?.slug}`} target="_blank" rel="noopener noreferrer">
+                                View <ExternalLink className="h-3 w-3 ml-1" />
+                              </a>
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <div className="overflow-hidden max-w-[80%]">
+                              <p className="text-xs font-bold text-zinc-850 truncate">{qrData?.custom_url}</p>
+                              <p className="text-[10px] text-zinc-500 font-semibold">Custom Redirect URL</p>
+                            </div>
+                            <Button asChild variant="link" className="h-auto p-0 text-xs text-blue-650 hover:text-blue-750 font-bold uppercase tracking-wider">
+                              <a href={qrData?.custom_url} target="_blank" rel="noopener noreferrer">
+                                Visit <ExternalLink className="h-3 w-3 ml-1" />
+                              </a>
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-6 border-t border-zinc-150">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setQrData(null);
+                          setScannedCode('');
+                          setScanState('idle');
+                        }}
+                        className="h-11 rounded-xl border-zinc-200 bg-white text-zinc-700 font-bold text-xs uppercase tracking-wider"
+                      >
+                        Scan Another
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleUnlinkQR}
+                        disabled={unlinkLoading}
+                        className="h-11 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 font-bold text-xs uppercase tracking-wider"
+                      >
+                        {unlinkLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                        ) : (
+                          <span>Disconnect QR</span>
+                        )}
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  /* OWNED BY SOMEONE ELSE STATE */
+                  <>
+                    <div className="text-center space-y-2">
+                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                        <ShieldAlert className="h-6 w-6" />
+                      </div>
+                      <h2 className="text-xl font-black text-zinc-900 tracking-tight">QR Already Connected</h2>
+                      <p className="text-xs sm:text-sm text-zinc-500 font-semibold">
+                        This physical QR code is linked to another user's account.
+                      </p>
+                    </div>
+
+                    <div className="space-y-4 pt-4 border-t border-zinc-100">
+                      <div className="p-4 bg-zinc-50 border border-zinc-200/60 rounded-2xl space-y-2">
+                        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block">
+                          Connection Details
+                        </span>
+                        {qrData?.assigned_profile_id ? (
+                          <div>
+                            <p className="text-xs font-bold text-zinc-700">Linked to Profile</p>
+                            <p className="text-[10px] text-zinc-400 font-semibold">Portid Profile slug: /{qrData?.profiles?.slug}</p>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="text-xs font-bold text-zinc-700">Custom Redirect Destination</p>
+                            <p className="text-[10px] text-zinc-400 font-semibold">This QR connects to a custom link destination.</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="pt-6 border-t border-zinc-150 text-center">
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setQrData(null);
+                          setScannedCode('');
+                          setScanState('idle');
+                        }}
+                        className="w-full h-11 rounded-xl bg-zinc-900 text-white font-bold text-xs uppercase tracking-wider"
+                      >
+                        Scan Another QR
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* SUCCESS STATE */}
+            {scanState === 'success' && (
+              <div className="space-y-6 text-left max-w-md mx-auto py-2">
+                <div className="text-center space-y-2">
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-lg shadow-emerald-500/5 animate-bounce">
+                    <Check className="h-8 w-8 stroke-[3]" />
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight">Successfully Connected!</h2>
+                  <p className="text-xs sm:text-sm text-zinc-500 font-semibold">
+                    Your physical QR code is now linked and active.
+                  </p>
+                </div>
+
+                <div className="space-y-4 pt-4 border-t border-zinc-100">
+                  <div className="p-4 bg-zinc-50 border border-zinc-200/60 rounded-2xl space-y-2">
+                    <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block">
+                      Target Destination
+                    </span>
+                    {qrData?.assigned_profile_id ? (
+                      <p className="text-xs font-bold text-zinc-800">
+                        Portid Profile: {qrData?.profiles?.brand_name || 'Profile'} (/{qrData?.profiles?.slug})
+                      </p>
+                    ) : (
+                      <p className="text-xs font-bold text-zinc-850 truncate">
+                        Custom URL: {qrData?.custom_url}
+                      </p>
+                    )}
+                    <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block pt-2">
+                      QR Code ID
+                    </span>
+                    <p className="text-xs font-mono font-bold text-zinc-800">{scannedCode}</p>
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-zinc-150 grid grid-cols-2 gap-3">
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setQrData(null);
+                      setScannedCode('');
+                      setScanState('idle');
+                    }}
+                    variant="outline"
+                    className="h-11 rounded-xl border-zinc-200 bg-white text-zinc-700 font-bold text-xs uppercase tracking-wider"
+                  >
+                    Scan Another
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setScanState('assigned');
+                    }}
+                    className="h-11 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-orange-500/20"
+                  >
+                    Manage Settings
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* ERROR STATE */}
+            {scanState === 'error' && (
+              <div className="space-y-6 text-center max-w-sm mx-auto py-4">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                  <ShieldAlert className="h-6 w-6" />
+                </div>
+                
+                <div className="space-y-2">
+                  <h2 className="text-lg font-black text-zinc-900 tracking-tight">Scan/Validation Error</h2>
+                  <p className="text-xs font-semibold text-zinc-500 leading-relaxed">
+                    {scannerError || "An unexpected error occurred during database verification."}
+                  </p>
+                </div>
+
+                <div className="pt-4 border-t border-zinc-100 flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setScanState('idle');
+                      setScannerError('');
+                    }}
+                    className="h-11 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs uppercase tracking-wider"
+                  >
+                    Try Again
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setMode('create');
+                      setScanState('idle');
+                      setScannerError('');
+                    }}
+                    className="h-11 rounded-xl border-zinc-200 bg-white text-zinc-700 font-bold text-xs uppercase tracking-wider"
+                  >
+                    Back to Generator
+                  </Button>
+                </div>
+              </div>
+            )}
+
           </Card>
-        </aside>
-      </main>
+        </main>
+      )}
 
       {/* UPGRADE / SIGNUP PROMPT MODAL */}
       <AnimatePresence>

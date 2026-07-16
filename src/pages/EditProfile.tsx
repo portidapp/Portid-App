@@ -133,7 +133,7 @@ const EditProfile = ({ passedId, forcedTab, embedded = false }: { passedId?: str
         navigate('/dashboard');
         return;
       }
-      setForm({ ...form, ...data, products: data.products || [], custom_links: data.custom_links || [], custom_link_label: data.vision, custom_link_url: data.mission });
+      setForm({ ...form, ...data, products: (data.products as unknown as Product[]) || [], custom_links: (data.custom_links as unknown as { id: string, name: string, url: string }[]) || [], custom_link_label: data.vision, custom_link_url: data.mission });
       setSlug(data.slug);
       setLogoPreview(data.logo_url);
       setCoverPreview(data.cover_image_url);

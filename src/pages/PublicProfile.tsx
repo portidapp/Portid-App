@@ -175,7 +175,7 @@ const PublicProfile = () => {
         const isExpired = expiresAt && expiresAt < new Date();
         const activePlanTier = isExpired ? 'basic' : (planRes.data?.plan_tier || 'basic');
 
-        setProfile({ ...data, plan_tier: activePlanTier } as Profile);
+        setProfile({ ...data, plan_tier: activePlanTier } as unknown as Profile);
         setMedia(mediaRes.data ?? []);
 
         // Track view (Non-blocking)
